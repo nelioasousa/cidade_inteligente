@@ -49,7 +49,11 @@ def discover_gateway():
         device_info=device_info, device_address=device_address
     )
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect(GATEWAY_ADDR)
+        try:
+            sock.connect(GATEWAY_ADDR)
+        except ConnectionRefusedError:
+            GATEWAY_ADDR = None
+            return
         sock.send(join_req.SerializeToString())
         join_reply = JoinReply()
         join_reply.ParseFromString(sock.recv(1024))
