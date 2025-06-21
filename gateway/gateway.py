@@ -3,7 +3,7 @@ import threading
 import time
 import json
 import datetime
-from messages_pb2 import Address, GatewayLocation, SensorReading
+from messages_pb2 import Address, SensorReading
 from messages_pb2 import JoinRequest, JoinReply
 
 
@@ -23,9 +23,8 @@ def multicast_gateway_location(interval_sec=5):
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
     address = Address(ip=GATEWAY_IP, port=GATEWAY_JOIN_PORT)
-    msg = GatewayLocation(address=address)
     while True:
-        sock.sendto(msg.SerializeToString(), MULTICAST_ADDR)
+        sock.sendto(address.SerializeToString(), MULTICAST_ADDR)
         time.sleep(interval_sec)
 
 

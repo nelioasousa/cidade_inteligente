@@ -13,12 +13,6 @@ class Address(_message.Message):
     port: int
     def __init__(self, ip: _Optional[str] = ..., port: _Optional[int] = ...) -> None: ...
 
-class GatewayLocation(_message.Message):
-    __slots__ = ("address",)
-    ADDRESS_FIELD_NUMBER: _ClassVar[int]
-    address: Address
-    def __init__(self, address: _Optional[_Union[Address, _Mapping]] = ...) -> None: ...
-
 class DeviceInfo(_message.Message):
     __slots__ = ("name", "state", "metadata")
     NAME_FIELD_NUMBER: _ClassVar[int]
