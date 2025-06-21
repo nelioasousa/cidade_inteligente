@@ -27,3 +27,31 @@ message SensorReading {
   string reading_value = 2;
   string timestamp = 3;
 }
+
+enum RequestType {
+  REQUESTTYPE_UNSPECIFIED = 0;
+  REQUESTTYPE_ACTION = 1;
+  REQUESTTYPE_GET_STATE = 2;
+  REQUESTTYPE_SET_STATE = 3;
+  REQUESTTYPE_GET_METADATA = 4;
+  REQUESTTYPE_SET_METADATA = 5;
+}
+
+message DeviceRequest {
+  RequestType type = 1;
+  string key = 2;
+  string value = 3;
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_OK = 1;
+  STATUS_FAIL = 2;
+  STATUS_DENIED = 3;
+  STATUS_UNKNOWN = 4;
+}
+
+message DeviceReply {
+  Status status = 1;
+  string result = 2;
+}
