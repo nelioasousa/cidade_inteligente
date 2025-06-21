@@ -2,12 +2,14 @@ import json
 import socket
 import time
 import datetime
-from messages_pb2 import GatewayLocation, Address, DeviceInfo, JoinRequest, JoinReply
+import random
+from messages_pb2 import GatewayLocation, Address, DeviceInfo, JoinRequest, JoinReply, SensorReading
 
 
 NAME = "Sensor-Temp-01"
 DEVICE_ADDR = (socket.gethostbyname(socket.gethostname()), 5000)
 MULTICAST_ADDR = ('224.0.1.0', 12345)
+BASE_TEMP = 20.0 + 20 * random.random()
 GATEWAY_ADDR = None
 REPORT_INTERVAL = None
 
@@ -23,6 +25,8 @@ METADATA = {
 def discover_gateway():
     global GATEWAY_ADDR
     global REPORT_INTERVAL
+    GATEWAY_ADDR = None
+    REPORT_INTERVAL = None
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(('', MULTICAST_ADDR[1]))
@@ -44,29 +48,35 @@ def discover_gateway():
         sock.send(join_req.SerializeToString())
         join_reply = JoinReply()
         join_reply.ParseFromString(sock.recv(1024))
+        GATEWAY_ADDR = (join_reply.report_address.ip, join_reply.report_address.port)
         REPORT_INTERVAL = join_reply.report_interval
 
 
-# def announce():
-#     info = DispositivoInfo(tipo="sensor", id=ID, ip="127.0.0.1", porta=6001, estado="ativo")
-#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-#     sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
-#     sock.sendto(info.SerializeToString(), ("224.0.0.1", 5000))
+def get_reading():
+    global BASE_TEMP
+    temp = min(max(BASE_TEMP + random.random() - 0.5, 20), 40)
+    BASE_TEMP = temp
+    return temp
 
-# def enviar_leitura():
-#     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-#     while True:
-#         if FALHA:
-#             print("[sensor_temp1] FALHA: parando envio.")
-#             break
-#         leitura = LeituraSensor(
-#             id=ID,
-#             tipo="temperatura",
-#             valor="24.7",
-#             timestamp=str(datetime.datetime.now())
-#         )
-#         s.sendto(leitura.SerializeToString(), ("127.0.0.1", 7000))
-#         time.sleep(15)
 
-# announce()
-# enviar_leitura()
+def transmit_readings(sock):
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        while GATEWAY_ADDR is not None:
+            reading = SensorReading()
+            reading.sensor_name = NAME
+            reading.reading_value = '%.2f' %get_reading()
+            reading.timestamp = datetime.datetime.now(tz=datetime.UTC).isoformat()
+            reading.metadata = json.dumps(METADATA, sort_keys=True)
+            sock.sendto(reading.SerializeToString(), GATEWAY_ADDR)
+            time.sleep(REPORT_INTERVAL)
+
+
+def run():
+    while True:
+        while GATEWAY_ADDR is None or REPORT_INTERVAL is None:
+            discover_gateway()
+        transmit_readings()
+
+
+if __name__ == '__main__':
+    run()
