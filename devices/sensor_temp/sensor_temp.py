@@ -77,7 +77,6 @@ def transmit_readings():
                 sensor_name=NAME,
                 reading_value='%.2f' %get_reading(),
                 timestamp=datetime.datetime.now(tz=datetime.UTC).isoformat(),
-                metadata=json.dumps(METADATA, sort_keys=True)
             )
             sock.sendto(reading.SerializeToString(), GATEWAY_ADDR)
             time.sleep(STATE['ReportInterval'])
