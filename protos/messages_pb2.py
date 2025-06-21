@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0emessages.proto\"#\n\x07\x41\x64\x64ress\x12\n\n\x02ip\x18\x01 \x01(\t\x12\x0c\n\x04port\x18\x02 \x01(\r\",\n\x0fGatewayLocation\x12\x19\n\x07\x61\x64\x64ress\x18\x01 \x01(\x0b\x32\x08.Address\";\n\nDeviceInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05state\x18\x02 \x01(\t\x12\x10\n\x08metadata\x18\x03 \x01(\t\"Q\n\x0bJoinRequest\x12 \n\x0b\x64\x65vice_info\x18\x01 \x01(\x0b\x32\x0b.DeviceInfo\x12 \n\x0e\x64\x65vice_address\x18\x02 \x01(\x0b\x32\x08.Address\"$\n\tJoinReply\x12\x17\n\x0freport_interval\x18\x01 \x01(\rb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0emessages.proto\"#\n\x07\x41\x64\x64ress\x12\n\n\x02ip\x18\x01 \x01(\t\x12\x0c\n\x04port\x18\x02 \x01(\r\",\n\x0fGatewayLocation\x12\x19\n\x07\x61\x64\x64ress\x18\x01 \x01(\x0b\x32\x08.Address\";\n\nDeviceInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05state\x18\x02 \x01(\t\x12\x10\n\x08metadata\x18\x03 \x01(\t\"Q\n\x0bJoinRequest\x12 \n\x0b\x64\x65vice_info\x18\x01 \x01(\x0b\x32\x0b.DeviceInfo\x12 \n\x0e\x64\x65vice_address\x18\x02 \x01(\x0b\x32\x08.Address\"F\n\tJoinReply\x12 \n\x0ereport_address\x18\x01 \x01(\x0b\x32\x08.Address\x12\x17\n\x0freport_interval\x18\x02 \x01(\r\"`\n\rSensorReading\x12\x13\n\x0bsensor_name\x18\x01 \x01(\t\x12\x15\n\rreading_value\x18\x02 \x01(\t\x12\x11\n\ttimestamp\x18\x03 \x01(\t\x12\x10\n\x08metadata\x18\x04 \x01(\tb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -40,5 +40,7 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_JOINREQUEST']._serialized_start=162
   _globals['_JOINREQUEST']._serialized_end=243
   _globals['_JOINREPLY']._serialized_start=245
-  _globals['_JOINREPLY']._serialized_end=281
+  _globals['_JOINREPLY']._serialized_end=315
+  _globals['_SENSORREADING']._serialized_start=317
+  _globals['_SENSORREADING']._serialized_end=413
 # @@protoc_insertion_point(module_scope)
