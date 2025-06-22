@@ -19,6 +19,7 @@ class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     STATUS_UNSPECIFIED: _ClassVar[Status]
     STATUS_OK: _ClassVar[Status]
+    STATUS_BAD: _ClassVar[Status]
     STATUS_FAIL: _ClassVar[Status]
     STATUS_DENIED: _ClassVar[Status]
     STATUS_UNKNOWN: _ClassVar[Status]
@@ -30,6 +31,7 @@ REQUESTTYPE_GET_METADATA: RequestType
 REQUESTTYPE_SET_METADATA: RequestType
 STATUS_UNSPECIFIED: Status
 STATUS_OK: Status
+STATUS_BAD: Status
 STATUS_FAIL: Status
 STATUS_DENIED: Status
 STATUS_UNKNOWN: Status
