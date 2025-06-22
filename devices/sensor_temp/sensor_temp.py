@@ -4,10 +4,13 @@ import time
 import datetime
 import random
 import threading
+from types import NoneType
+from numbers import Real
 from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import Address, SensorReading
 from messages_pb2 import DeviceInfo, JoinRequest, JoinReply
-from messages_pb2 import DeviceRequest, DeviceReply, RequestType, Status
+from messages_pb2 import DeviceRequest, DeviceReply, RequestType, ReplyStatus
+from google.protobuf import message
 
 
 NAME = 'Sensor-Temp-01'
@@ -91,8 +94,7 @@ def transmit_readings():
 
 
 def exec_action(action):
-    status = Status.STATUS_OK
-    result = ''
+    status = ReplyStatus.OK
     match action.strip().lower():
         case 'reset':
             global GATEWAY_ADDR
@@ -110,53 +112,123 @@ def exec_action(action):
             METADATA['UnitName'] = 'Kelvin'
             METADATA['UnitSymbol'] = 'K'
         case _:
-            status = Status.STATUS_UNKNOWN
-    return status, result
+            status = ReplyStatus.UNKNOWN_ACTION
+    return status, ''
+
+
+def set_state(state_string):
+    try:
+        new_state = json.loads(state_string)
+    except json.JSONDecodeError:
+        return (
+            ReplyStatus.BAD_REQUEST,
+            'Não foi possível decodificar o corpo da requisição'
+        )
+    except UnicodeDecodeError:
+        return (
+            ReplyStatus.BAD_REQUEST,
+            'Corpo da requisição precisar estar codificado em UTF-8, 16 ou 32'
+        )
+    if not isinstance(new_state, dict):
+        return (
+            ReplyStatus.BAD_REQUEST,
+            'Corpo da requisição precisar ser um objeto JSON.'
+        )
+    if 'Actions' in new_state:
+        return ReplyStatus.DENIED, '"Actions" é readonly'
+    if not isinstance(new_state.get('ReportInterval'), (NoneType, Real)):
+        return (
+            ReplyStatus.BAD_REQUEST,
+            '"ReportInterval" precisa ser `None` ou numérico (`int`, `float`)'
+        )
+    if (set(new_state) - set(STATE)):
+        return ReplyStatus.BAD_REQUEST, 'Existem chaves inválidas'
+    reply_body = json.dumps(STATE)
+    STATE.update(new_state)
+    return ReplyStatus.OK, reply_body
+
+
+def set_metadata(metadata_string):
+    try:
+        new_metadata = json.loads(metadata_string)
+    except json.JSONDecodeError:
+        return (
+            ReplyStatus.BAD_REQUEST,
+            'Não foi possível decodificar o corpo da requisição'
+        )
+    except UnicodeDecodeError:
+        return (
+            ReplyStatus.BAD_REQUEST,
+            'Corpo da requisição precisar estar codificado em UTF-8, 16 ou 32'
+        )
+    if not isinstance(new_metadata, dict):
+        return (
+            ReplyStatus.BAD_REQUEST,
+            'Corpo da requisição precisar ser um objeto JSON.'
+        )
+    if 'UnitName' in new_metadata or 'UnitSymbol' in new_metadata:
+        return (
+            ReplyStatus.DENIED,
+            '"UnitName" e "UnitSymbol" são readonly. '
+            'Use `RequestType.ACTION` para mudar as unidades de medição.'
+        )
+    if 'Location' in new_metadata:
+        try:
+            lat = new_metadata['Location']['Latitude']
+            long = new_metadata['Location']['Longitude']
+        except KeyError:
+            return (
+                ReplyStatus.BAD_REQUEST,
+                'Valor de "Location" precisa ser da forma '
+                '{"Latitude": <`float`>, "Longitude": <`float`>}'
+            )
+        if not (isinstance(lat, Real) and isinstance(long, Real)):
+            return (
+                ReplyStatus.BAD_REQUEST,
+                '"Latitude" e "Longitude" precisam ser `float`'
+            )
+    reply_body = json.dumps(METADATA)
+    METADATA.update(new_metadata)
+    return ReplyStatus.OK, reply_body
 
 
 def request_handler(sock):
     try:
+        sock.settimeout(3.0)
         req = DeviceRequest()
         req.ParseFromString(sock.recv(1024))
+    except TimeoutError:
+        status = ReplyStatus.TIMEOUT
+        reply_body = 'Requisição do cliente não chegou em tempo hábil'
+    except message.DecodeError:
+        status = ReplyStatus.BAD_REQUEST
+        reply_body = 'Não foi possível compreender a requisição'
     except Exception:
-        status, result = Status.STATUS_BAD, ''
+        status = ReplyStatus.FAIL
+        reply_body = 'Erro ao processar a requisição'
     else:
         match req.type:
-            case RequestType.REQUESTTYPE_ACTION:
-                status, result = exec_action(req.key)
-            case RequestType.REQUESTTYPE_GET_STATE:
-                try:
-                    result = STATE[req.key]
-                    status = Status.STATUS_OK
-                except KeyError:
-                    status, result = Status.STATUS_UNKNOWN, ''
-            case RequestType.REQUESTTYPE_SET_STATE:
-                try:
-                    result = STATE[req.key]
-                    status = Status.STATUS_OK
-                    STATE[req.key] = req.value
-                except KeyError:
-                    status, result = Status.STATUS_UNKNOWN, ''
-            case RequestType.REQUESTTYPE_GET_METADATA:
-                try:
-                    result = METADATA[req.key]
-                    status = Status.STATUS_OK
-                except KeyError:
-                    status, result = Status.STATUS_UNKNOWN, ''
-            case RequestType.REQUESTTYPE_SET_METADATA:
-                try:
-                    result = METADATA[req.key]
-                    status = Status.STATUS_OK
-                    METADATA[req.key] = req.value
-                except KeyError:
-                    status, result = Status.STATUS_UNKNOWN, ''
+            case RequestType.ACTION:
+                status, reply_body = exec_action(req.body)
+            case RequestType.GET_STATE:
+                reply_body = json.dumps(STATE)
+                status = ReplyStatus.OK
+            case RequestType.SET_STATE:
+                status, reply_body = set_state(req.body)
+            case RequestType.GET_METADATA:
+                reply_body = json.dumps(METADATA)
+                status = ReplyStatus.OK
+            case RequestType.SET_METADATA:
+                status, reply_body = set_metadata(req.body)
             case _:
-                status, result = Status.STATUS_UNKNOWN, ''
+                status, reply_body = ReplyStatus.UNKNOWN_TYPE, ''
     finally:
-        reply = DeviceReply(status=status, result=result)
-        sock.send(reply.SerializeToString())
-        sock.shutdown(socket.SHUT_RDWR)
-        sock.close()
+        try:
+            reply = DeviceReply(status=status, body=reply_body)
+            sock.send(reply.SerializeToString())
+        finally:
+            sock.shutdown(socket.SHUT_RDWR)
+            sock.close()
 
 
 def request_listener(stop_listening):

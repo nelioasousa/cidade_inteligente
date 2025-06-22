@@ -29,30 +29,31 @@ message SensorReading {
 }
 
 enum RequestType {
-  REQUESTTYPE_UNSPECIFIED = 0;
-  REQUESTTYPE_ACTION = 1;
-  REQUESTTYPE_GET_STATE = 2;
-  REQUESTTYPE_SET_STATE = 3;
-  REQUESTTYPE_GET_METADATA = 4;
-  REQUESTTYPE_SET_METADATA = 5;
+  RT_UNSPECIFIED = 0;
+  ACTION = 1;
+  GET_STATE = 2;
+  SET_STATE = 3;
+  GET_METADATA = 4;
+  SET_METADATA = 5;
 }
 
 message DeviceRequest {
   RequestType type = 1;
-  string key = 2;
-  string value = 3;
+  string body = 2;
 }
 
-enum Status {
-  STATUS_UNSPECIFIED = 0;
-  STATUS_OK = 1;
-  STATUS_BAD = 2;
-  STATUS_FAIL = 3;
-  STATUS_DENIED = 4;
-  STATUS_UNKNOWN = 5;
+enum ReplyStatus {
+  RS_UNSPECIFIED = 0;
+  OK = 1;
+  BAD_REQUEST = 2;
+  FAIL = 3;
+  DENIED = 4;
+  TIMEOUT = 5;
+  UNKNOWN_TYPE = 6;
+  UNKNOWN_ACTION = 7;
 }
 
 message DeviceReply {
-  Status status = 1;
-  string result = 2;
+  ReplyStatus status = 1;
+  string body = 2;
 }
