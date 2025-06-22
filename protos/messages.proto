@@ -46,9 +46,10 @@ message DeviceRequest {
 enum Status {
   STATUS_UNSPECIFIED = 0;
   STATUS_OK = 1;
-  STATUS_FAIL = 2;
-  STATUS_DENIED = 3;
-  STATUS_UNKNOWN = 4;
+  STATUS_BAD = 2;
+  STATUS_FAIL = 3;
+  STATUS_DENIED = 4;
+  STATUS_UNKNOWN = 5;
 }
 
 message DeviceReply {

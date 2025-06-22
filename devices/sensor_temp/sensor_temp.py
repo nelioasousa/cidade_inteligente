@@ -3,8 +3,10 @@ import socket
 import time
 import datetime
 import random
+import threading
 from messages_pb2 import Address, SensorReading
 from messages_pb2 import DeviceInfo, JoinRequest, JoinReply
+from messages_pb2 import DeviceRequest, DeviceReply, RequestType, Status
 
 
 NAME = "Sensor-Temp-01"
@@ -15,9 +17,9 @@ BASE_TEMP = 20.0 + 20 * random.random()
 GATEWAY_ADDR = None
 
 
-STATE  = {'ReportInterval': None}
+STATE = {'ReportInterval': None}
 METADATA = {
-    'UnitName': 'celsius',
+    'UnitName': 'Celsius',
     'UnitSymbol': '°C',
     'Location': {'Latitude': -3.733486, 'Longitude': -38.570860}
 }
@@ -67,12 +69,17 @@ def get_reading():
     global BASE_TEMP
     temp = min(max(BASE_TEMP + random.random() - 0.5, 20), 40)
     BASE_TEMP = temp
-    return temp
+    if METADATA['UnitName'] == 'Kelvin':
+        return temp + 273.15
+    elif METADATA['UnitName'] == 'Fahrenheit':
+        return 32.0 + (temp * 9 / 5)
+    else:
+        return temp
 
 
 def transmit_readings():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        while GATEWAY_ADDR is not None:
+        while GATEWAY_ADDR is not None and STATE['ReportInterval'] is not None:
             reading = SensorReading(
                 sensor_name=NAME,
                 reading_value='%.2f' %get_reading(),
@@ -82,10 +89,88 @@ def transmit_readings():
             time.sleep(STATE['ReportInterval'])
 
 
+def exec_action(action, value):
+    match action.strip().lower():
+        case 'reset':
+            global GATEWAY_ADDR
+            GATEWAY_ADDR = None
+            STATE['ReportInterval'] = None
+            METADATA['UnitName'] = 'Celsius'
+            METADATA['UnitSymbol'] = '°C'
+            status, result = Status.STATUS_OK, ''
+        case 'fahrenheit':
+            replaced = {k: METADATA[k] for k in ('UnitName', 'UnitSymbol')}
+            METADATA['UnitName'] = 'Fahrenheit'
+            METADATA['UnitSymbol'] = 'F'
+            status, result = Status.STATUS_OK, json.dumps(replaced)
+        case 'kelvin':
+            replaced = {k: METADATA[k] for k in ('UnitName', 'UnitSymbol')}
+            METADATA['UnitName'] = 'Kelvin'
+            METADATA['UnitSymbol'] = 'K'
+            status, result = Status.STATUS_OK, json.dumps(replaced)
+        case _:
+            status, result = Status.STATUS_UNKNOWN, ''
+    return status, result
+
+
+def request_handler(sock):
+    with sock:
+        try:
+            req = DeviceRequest()
+            req.ParseFromString(sock.recv(1024))
+        except Exception:
+            status, result = Status.STATUS_BAD, ''
+        else:
+            match req.type:
+                case RequestType.REQUESTTYPE_ACTION:
+                    status, result = exec_action(req.key, req.value)
+                case RequestType.REQUESTTYPE_GET_STATE:
+                    try:
+                        result = STATE[req.key]
+                        status = Status.STATUS_OK
+                    except KeyError:
+                        status, result = Status.STATUS_UNKNOWN, ''
+                case RequestType.REQUESTTYPE_SET_STATE:
+                    try:
+                        result = STATE[req.key]
+                        status = Status.STATUS_OK
+                        STATE[req.key] = req.value
+                    except KeyError:
+                        status, result = Status.STATUS_UNKNOWN, ''
+                case RequestType.REQUESTTYPE_GET_METADATA:
+                    try:
+                        result = METADATA[req.key]
+                        status = Status.STATUS_OK
+                    except KeyError:
+                        status, result = Status.STATUS_UNKNOWN, ''
+                case RequestType.REQUESTTYPE_SET_METADATA:
+                    try:
+                        result = METADATA[req.key]
+                        status = Status.STATUS_OK
+                        METADATA[req.key] = req.value
+                    except KeyError:
+                        status, result = Status.STATUS_UNKNOWN, ''
+                case _:
+                    status, result = Status.STATUS_UNKNOWN, ''
+        finally:
+            reply = DeviceReply(status=status, result=result)
+            sock.send(reply.SerializeToString())
+            sock.shutdown(socket.SHUT_RDWR)
+
+
+def request_listener():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(('', DEVICE_PORT))
+        sock.listen()
+        while True:
+            conn, _ = sock.accept()
+            threading.Thread(target=request_handler, args=(conn,)).start()
+
+
 def run():
+    threading.Thread(target=request_listener, daemon=True).start()
     while True:
-        while GATEWAY_ADDR is None or STATE['ReportInterval'] is None:
-            discover_gateway()
+        discover_gateway()
         transmit_readings()
 
 
