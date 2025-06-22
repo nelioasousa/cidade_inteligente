@@ -4,6 +4,7 @@ import time
 import datetime
 import random
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import Address, SensorReading
 from messages_pb2 import DeviceInfo, JoinRequest, JoinReply
 from messages_pb2 import DeviceRequest, DeviceReply, RequestType, Status
@@ -162,9 +163,14 @@ def request_listener(stop_listening):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(('', DEVICE_PORT))
         sock.listen()
-        while not stop_listening.is_set():
-            conn, _ = sock.accept()
-            threading.Thread(target=request_handler, args=(conn,)).start()
+        sock.settimeout(2.0)
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            while not stop_listening.is_set():
+                try:
+                    conn, _ = sock.accept()
+                except TimeoutError:
+                    continue
+                executor.submit(request_handler, conn)
 
 
 def run():
