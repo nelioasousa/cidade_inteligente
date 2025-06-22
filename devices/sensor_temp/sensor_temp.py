@@ -19,13 +19,13 @@ GATEWAY_ADDR = None
 
 STATE = {
     'ReportInterval': None,
-    'Actions': ('reset', 'celsius', 'fahrenheit', 'kelvin')
+    'Actions': ('reset', 'celsius', 'fahrenheit', 'kelvin'),
 }
 
 METADATA = {
     'UnitName': 'Celsius',
     'UnitSymbol': '°C',
-    'Location': {'Latitude': -3.733486, 'Longitude': -38.570860}
+    'Location': {'Latitude': -3.733486, 'Longitude': -38.570860},
 }
 
 
@@ -158,20 +158,26 @@ def request_handler(sock):
         sock.close()
 
 
-def request_listener():
+def request_listener(stop_listening):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(('', DEVICE_PORT))
         sock.listen()
-        while True:
+        while not stop_listening.is_set():
             conn, _ = sock.accept()
             threading.Thread(target=request_handler, args=(conn,)).start()
 
 
 def run():
-    threading.Thread(target=request_listener, daemon=True).start()
-    while True:
-        discover_gateway()
-        transmit_readings()
+    stop_listening = threading.Event()
+    try:
+        listener = threading.Thread(target=request_listener, args=(stop_listening,))
+        listener.start()
+        while True:
+            discover_gateway()
+            transmit_readings()
+    finally:
+        stop_listening.set()
+        listener.join()
 
 
 if __name__ == '__main__':
