@@ -8,33 +8,37 @@ DESCRIPTOR: _descriptor.FileDescriptor
 
 class RequestType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
-    REQUESTTYPE_UNSPECIFIED: _ClassVar[RequestType]
-    REQUESTTYPE_ACTION: _ClassVar[RequestType]
-    REQUESTTYPE_GET_STATE: _ClassVar[RequestType]
-    REQUESTTYPE_SET_STATE: _ClassVar[RequestType]
-    REQUESTTYPE_GET_METADATA: _ClassVar[RequestType]
-    REQUESTTYPE_SET_METADATA: _ClassVar[RequestType]
+    RT_UNSPECIFIED: _ClassVar[RequestType]
+    ACTION: _ClassVar[RequestType]
+    GET_STATE: _ClassVar[RequestType]
+    SET_STATE: _ClassVar[RequestType]
+    GET_METADATA: _ClassVar[RequestType]
+    SET_METADATA: _ClassVar[RequestType]
 
-class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+class ReplyStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
-    STATUS_UNSPECIFIED: _ClassVar[Status]
-    STATUS_OK: _ClassVar[Status]
-    STATUS_BAD: _ClassVar[Status]
-    STATUS_FAIL: _ClassVar[Status]
-    STATUS_DENIED: _ClassVar[Status]
-    STATUS_UNKNOWN: _ClassVar[Status]
-REQUESTTYPE_UNSPECIFIED: RequestType
-REQUESTTYPE_ACTION: RequestType
-REQUESTTYPE_GET_STATE: RequestType
-REQUESTTYPE_SET_STATE: RequestType
-REQUESTTYPE_GET_METADATA: RequestType
-REQUESTTYPE_SET_METADATA: RequestType
-STATUS_UNSPECIFIED: Status
-STATUS_OK: Status
-STATUS_BAD: Status
-STATUS_FAIL: Status
-STATUS_DENIED: Status
-STATUS_UNKNOWN: Status
+    RS_UNSPECIFIED: _ClassVar[ReplyStatus]
+    OK: _ClassVar[ReplyStatus]
+    BAD_REQUEST: _ClassVar[ReplyStatus]
+    FAIL: _ClassVar[ReplyStatus]
+    DENIED: _ClassVar[ReplyStatus]
+    TIMEOUT: _ClassVar[ReplyStatus]
+    UNKNOWN_TYPE: _ClassVar[ReplyStatus]
+    UNKNOWN_ACTION: _ClassVar[ReplyStatus]
+RT_UNSPECIFIED: RequestType
+ACTION: RequestType
+GET_STATE: RequestType
+SET_STATE: RequestType
+GET_METADATA: RequestType
+SET_METADATA: RequestType
+RS_UNSPECIFIED: ReplyStatus
+OK: ReplyStatus
+BAD_REQUEST: ReplyStatus
+FAIL: ReplyStatus
+DENIED: ReplyStatus
+TIMEOUT: ReplyStatus
+UNKNOWN_TYPE: ReplyStatus
+UNKNOWN_ACTION: ReplyStatus
 
 class Address(_message.Message):
     __slots__ = ("ip", "port")
@@ -81,19 +85,17 @@ class SensorReading(_message.Message):
     def __init__(self, sensor_name: _Optional[str] = ..., reading_value: _Optional[str] = ..., timestamp: _Optional[str] = ...) -> None: ...
 
 class DeviceRequest(_message.Message):
-    __slots__ = ("type", "key", "value")
+    __slots__ = ("type", "body")
     TYPE_FIELD_NUMBER: _ClassVar[int]
-    KEY_FIELD_NUMBER: _ClassVar[int]
-    VALUE_FIELD_NUMBER: _ClassVar[int]
+    BODY_FIELD_NUMBER: _ClassVar[int]
     type: RequestType
-    key: str
-    value: str
-    def __init__(self, type: _Optional[_Union[RequestType, str]] = ..., key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    body: str
+    def __init__(self, type: _Optional[_Union[RequestType, str]] = ..., body: _Optional[str] = ...) -> None: ...
 
 class DeviceReply(_message.Message):
-    __slots__ = ("status", "result")
+    __slots__ = ("status", "body")
     STATUS_FIELD_NUMBER: _ClassVar[int]
-    RESULT_FIELD_NUMBER: _ClassVar[int]
-    status: Status
-    result: str
-    def __init__(self, status: _Optional[_Union[Status, str]] = ..., result: _Optional[str] = ...) -> None: ...
+    BODY_FIELD_NUMBER: _ClassVar[int]
+    status: ReplyStatus
+    body: str
+    def __init__(self, status: _Optional[_Union[ReplyStatus, str]] = ..., body: _Optional[str] = ...) -> None: ...
