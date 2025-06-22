@@ -93,51 +93,6 @@ def sensors_listener():
                 continue
 
 
-# def monitoramento():
-#     while True:
-#         now = time.time()
-#         for id, (info, addr, last_seen) in list(DEVICES.items()):
-#             if now - last_seen > 30:
-#                 print(f"[ALERTA] {id} inativo. Removendo...")
-#                 DEVICES.pop(id)
-#         time.sleep(10)
-
-
-# def handle_client(conn):
-#     while True:
-#         data = conn.recv(1024)
-#         if not data:
-#             break
-#         cmd = Comando()
-#         cmd.ParseFromString(data)
-#         if cmd.id == "LISTAR":
-#             resposta = ListaDispositivos()
-#             for d in DEVICES.values():
-#                 resposta.dispositivos.append(d[0])
-#             conn.send(resposta.SerializeToString())
-#         elif cmd.id in DEVICES:
-#             _, (ip, _) , _ = DEVICES[cmd.id]
-#             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-#                 s.connect((ip, 6000))
-#                 s.send(data)
-#                 resposta = s.recv(1024)  # Recebe a resposta do dispositivo
-#                 conn.send(resposta)  # Encaminha a resposta ao cliente
-#                 DEVICES[cmd.id] = (
-#                     DEVICES[cmd.id][0], DEVICES[cmd.id][1], time.time()
-#                 )
-
-
-# def client_listener():
-#     server = socket.socket()
-#     server.bind(("0.0.0.0", 9000))
-#     server.listen()
-#     while True:
-#         conn, _ = server.accept()
-#         threading.Thread(
-#             target=handle_client, args=(conn,), daemon=True
-#         ).start()
-
-
 if __name__ == '__main__':
     threading.Thread(target=multicast_gateway_location, daemon=True).start()
     threading.Thread(target=join_listener, daemon=True).start()
