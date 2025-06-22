@@ -96,31 +96,31 @@ def sensors_listener():
                 continue
 
 
-def make_requests(device_name):
-    device = DEVICES[device_name]
+# def make_requests(device_name):
+#     device = DEVICES[device_name]
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect(device['address'])
-        sock.settimeout(5.0)
-        req = DeviceRequest(
-            type=RequestType.ACTION,
-            body='kelvin'
-        )
-        sock.send(req.SerializeToString())
-        reply = DeviceReply()
-        reply.ParseFromString(sock.recv(1024))
-        print(reply)
-        sock.shutdown(socket.SHUT_RDWR)
+#     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+#         sock.connect(device['address'])
+#         sock.settimeout(5.0)
+#         req = DeviceRequest(
+#             type=RequestType.ACTION,
+#             body='kelvin'
+#         )
+#         sock.send(req.SerializeToString())
+#         reply = DeviceReply()
+#         reply.ParseFromString(sock.recv(1024))
+#         print(reply)
+#         sock.shutdown(socket.SHUT_RDWR)
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect(device['address'])
-        sock.settimeout(5.0)
-        req = DeviceRequest(type=RequestType.GET_STATE)
-        sock.send(req.SerializeToString())
-        reply = DeviceReply()
-        reply.ParseFromString(sock.recv(1024))
-        print(reply)
-        sock.shutdown(socket.SHUT_RDWR)
+#     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+#         sock.connect(device['address'])
+#         sock.settimeout(5.0)
+#         req = DeviceRequest(type=RequestType.GET_STATE)
+#         sock.send(req.SerializeToString())
+#         reply = DeviceReply()
+#         reply.ParseFromString(sock.recv(1024))
+#         print(reply)
+#         sock.shutdown(socket.SHUT_RDWR)
 
 
 if __name__ == '__main__':
@@ -129,8 +129,3 @@ if __name__ == '__main__':
     threading.Thread(target=sensors_listener, daemon=True).start()
     while True:
         time.sleep(10)
-        try:
-            make_requests('Sensor-Temp-01')
-        except Exception as e:
-            traceback.print_exc()
-            pass
