@@ -9,7 +9,7 @@ from messages_pb2 import DeviceInfo, JoinRequest, JoinReply
 from messages_pb2 import DeviceRequest, DeviceReply, RequestType, Status
 
 
-NAME = "Sensor-Temp-01"
+NAME = 'Sensor-Temp-01'
 DEVICE_IP = socket.gethostbyname(socket.gethostname())
 DEVICE_PORT = 5000
 MULTICAST_ADDR = ('224.0.1.0', 12345)
@@ -17,7 +17,11 @@ BASE_TEMP = 20.0 + 20 * random.random()
 GATEWAY_ADDR = None
 
 
-STATE = {'ReportInterval': None}
+STATE = {
+    'ReportInterval': None,
+    'Actions': ('reset', 'celsius', 'fahrenheit', 'kelvin')
+}
+
 METADATA = {
     'UnitName': 'Celsius',
     'UnitSymbol': '°C',
@@ -27,36 +31,29 @@ METADATA = {
 
 def discover_gateway():
     global GATEWAY_ADDR
-    global STATE
     GATEWAY_ADDR = None
     STATE['ReportInterval'] = None
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(('', MULTICAST_ADDR[1]))
-        mreq = (
+        sock.setsockopt(
+            socket.IPPROTO_IP,
+            socket.IP_ADD_MEMBERSHIP,
             socket.inet_aton(MULTICAST_ADDR[0]) + socket.inet_aton('0.0.0.0')
         )
-        sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-        while GATEWAY_ADDR is None:
-            gateway_addrs = Address()
-            gateway_addrs.ParseFromString(sock.recv(1024))
-            GATEWAY_ADDR = (gateway_addrs.ip, gateway_addrs.port)
+        gateway_addrs = Address()
+        gateway_addrs.ParseFromString(sock.recv(1024))
+        GATEWAY_ADDR = (gateway_addrs.ip, gateway_addrs.port)
     device_info = DeviceInfo(
-        name=NAME,
-        state=json.dumps(STATE, sort_keys=True),
-        metadata=json.dumps(METADATA, sort_keys=True)
+        name=NAME, state=json.dumps(STATE), metadata=json.dumps(METADATA)
     )
     device_address = Address(ip=DEVICE_IP, port=DEVICE_PORT)
-    join_req = JoinRequest(
+    join_request = JoinRequest(
         device_info=device_info, device_address=device_address
     )
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        try:
-            sock.connect(GATEWAY_ADDR)
-        except ConnectionRefusedError:
-            GATEWAY_ADDR = None
-            return
-        sock.send(join_req.SerializeToString())
+        sock.connect(GATEWAY_ADDR)
+        sock.send(join_request.SerializeToString())
         join_reply = JoinReply()
         join_reply.ParseFromString(sock.recv(1024))
         GATEWAY_ADDR = (
@@ -73,8 +70,11 @@ def get_reading():
         return temp + 273.15
     elif METADATA['UnitName'] == 'Fahrenheit':
         return 32.0 + (temp * 9 / 5)
-    else:
+    elif METADATA['UnitName'] == 'Celsius':
         return temp
+    # Pode ser útil para simular falhas
+    else:
+        raise RuntimeError('Bad metadata')
 
 
 def transmit_readings():
@@ -89,7 +89,9 @@ def transmit_readings():
             time.sleep(STATE['ReportInterval'])
 
 
-def exec_action(action, value):
+def exec_action(action):
+    status = Status.STATUS_OK
+    result = ''
     match action.strip().lower():
         case 'reset':
             global GATEWAY_ADDR
@@ -97,65 +99,63 @@ def exec_action(action, value):
             STATE['ReportInterval'] = None
             METADATA['UnitName'] = 'Celsius'
             METADATA['UnitSymbol'] = '°C'
-            status, result = Status.STATUS_OK, ''
+        case 'celsius':
+            METADATA['UnitName'] = 'Celsius'
+            METADATA['UnitSymbol'] = '°C'
         case 'fahrenheit':
-            replaced = {k: METADATA[k] for k in ('UnitName', 'UnitSymbol')}
             METADATA['UnitName'] = 'Fahrenheit'
             METADATA['UnitSymbol'] = 'F'
-            status, result = Status.STATUS_OK, json.dumps(replaced)
         case 'kelvin':
-            replaced = {k: METADATA[k] for k in ('UnitName', 'UnitSymbol')}
             METADATA['UnitName'] = 'Kelvin'
             METADATA['UnitSymbol'] = 'K'
-            status, result = Status.STATUS_OK, json.dumps(replaced)
         case _:
-            status, result = Status.STATUS_UNKNOWN, ''
+            status = Status.STATUS_UNKNOWN
     return status, result
 
 
 def request_handler(sock):
-    with sock:
-        try:
-            req = DeviceRequest()
-            req.ParseFromString(sock.recv(1024))
-        except Exception:
-            status, result = Status.STATUS_BAD, ''
-        else:
-            match req.type:
-                case RequestType.REQUESTTYPE_ACTION:
-                    status, result = exec_action(req.key, req.value)
-                case RequestType.REQUESTTYPE_GET_STATE:
-                    try:
-                        result = STATE[req.key]
-                        status = Status.STATUS_OK
-                    except KeyError:
-                        status, result = Status.STATUS_UNKNOWN, ''
-                case RequestType.REQUESTTYPE_SET_STATE:
-                    try:
-                        result = STATE[req.key]
-                        status = Status.STATUS_OK
-                        STATE[req.key] = req.value
-                    except KeyError:
-                        status, result = Status.STATUS_UNKNOWN, ''
-                case RequestType.REQUESTTYPE_GET_METADATA:
-                    try:
-                        result = METADATA[req.key]
-                        status = Status.STATUS_OK
-                    except KeyError:
-                        status, result = Status.STATUS_UNKNOWN, ''
-                case RequestType.REQUESTTYPE_SET_METADATA:
-                    try:
-                        result = METADATA[req.key]
-                        status = Status.STATUS_OK
-                        METADATA[req.key] = req.value
-                    except KeyError:
-                        status, result = Status.STATUS_UNKNOWN, ''
-                case _:
+    try:
+        req = DeviceRequest()
+        req.ParseFromString(sock.recv(1024))
+    except Exception:
+        status, result = Status.STATUS_BAD, ''
+    else:
+        match req.type:
+            case RequestType.REQUESTTYPE_ACTION:
+                status, result = exec_action(req.key)
+            case RequestType.REQUESTTYPE_GET_STATE:
+                try:
+                    result = STATE[req.key]
+                    status = Status.STATUS_OK
+                except KeyError:
                     status, result = Status.STATUS_UNKNOWN, ''
-        finally:
-            reply = DeviceReply(status=status, result=result)
-            sock.send(reply.SerializeToString())
-            sock.shutdown(socket.SHUT_RDWR)
+            case RequestType.REQUESTTYPE_SET_STATE:
+                try:
+                    result = STATE[req.key]
+                    status = Status.STATUS_OK
+                    STATE[req.key] = req.value
+                except KeyError:
+                    status, result = Status.STATUS_UNKNOWN, ''
+            case RequestType.REQUESTTYPE_GET_METADATA:
+                try:
+                    result = METADATA[req.key]
+                    status = Status.STATUS_OK
+                except KeyError:
+                    status, result = Status.STATUS_UNKNOWN, ''
+            case RequestType.REQUESTTYPE_SET_METADATA:
+                try:
+                    result = METADATA[req.key]
+                    status = Status.STATUS_OK
+                    METADATA[req.key] = req.value
+                except KeyError:
+                    status, result = Status.STATUS_UNKNOWN, ''
+            case _:
+                status, result = Status.STATUS_UNKNOWN, ''
+    finally:
+        reply = DeviceReply(status=status, result=result)
+        sock.send(reply.SerializeToString())
+        sock.shutdown(socket.SHUT_RDWR)
+        sock.close()
 
 
 def request_listener():
