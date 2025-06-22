@@ -72,13 +72,9 @@ def get_reading():
     BASE_TEMP = temp
     if METADATA['UnitName'] == 'Kelvin':
         return temp + 273.15
-    elif METADATA['UnitName'] == 'Fahrenheit':
+    if METADATA['UnitName'] == 'Fahrenheit':
         return 32.0 + (temp * 9 / 5)
-    elif METADATA['UnitName'] == 'Celsius':
-        return temp
-    # Pode ser útil para simular falhas
-    else:
-        raise RuntimeError('Bad metadata')
+    return temp
 
 
 def transmit_readings():
