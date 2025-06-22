@@ -3,6 +3,7 @@ import threading
 import time
 import json
 import datetime
+from concurrent.futures import ThreadPoolExecutor
 from google.protobuf import message
 from messages_pb2 import Address, SensorReading
 from messages_pb2 import JoinRequest, JoinReply
@@ -30,47 +31,50 @@ def multicast_location(stop_flag, interval_sec=5.0):
 
 
 def join_handler(sock):
-    with sock:
-        try:
-            req = JoinRequest()
-            req.ParseFromString(sock.recv(1024))
-        except Exception:
-            pass
+    try:
+        sock.settimeout(5.0)
+        req = JoinRequest()
+        req.ParseFromString(sock.recv(1024))
+    except Exception:
+        return
+    else:
+        device_info = {
+            'name': req.device_info.name,
+            'address': (req.device_address.ip, req.device_address.port),
+            'state': json.loads(req.device_info.state),
+            'metadata': json.loads(req.device_info.metadata),
+            'data': []
+        }
+        name = device_info['name']
+        CONNECTED_DEVICES[name] = device_info
+        if name.startswith('Sensor'):
+            report_interval = SENSORS_REPORT_INTERVAL
+            report_port = GATEWAY_SENSORS_PORT
         else:
-            device_info = {
-                'name': req.device_info.name,
-                'address': (req.device_address.ip, req.device_address.port),
-                'state': json.loads(req.device_info.state),
-                'metadata': json.loads(req.device_info.metadata),
-                'data': []
-            }
-            name = device_info['name']
-            CONNECTED_DEVICES[name] = device_info
-            if name.startswith('Sensor'):
-                report_interval = SENSORS_REPORT_INTERVAL
-                report_address = Address(
-                    ip=GATEWAY_IP, port=GATEWAY_SENSORS_PORT
-                )
-            else:
-                report_interval = ACTUATORS_REPORT_INTERVAL
-                report_address = Address(
-                    ip=GATEWAY_IP, port=GATEWAY_ACTUATORS_PORT
-                )
-            reply = JoinReply(
-                report_address=report_address, report_interval=report_interval
-            )
-            sock.send(reply.SerializeToString())
-        finally:
-            sock.shutdown(socket.SHUT_RDWR)
+            report_interval = ACTUATORS_REPORT_INTERVAL
+            report_port = GATEWAY_ACTUATORS_PORT
+        report_address = Address(ip=GATEWAY_IP, port=report_port)
+        reply = JoinReply(
+            report_address=report_address, report_interval=report_interval
+        )
+        sock.send(reply.SerializeToString())
+    finally:
+        sock.shutdown(socket.SHUT_RDWR)
+        sock.close()
 
 
 def join_listener(stop_flag):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(('', GATEWAY_JOIN_PORT))
         sock.listen()
-        while not stop_flag.is_set():
-            conn, _ = sock.accept()
-            threading.Thread(target=join_handler, args=(conn,)).start()
+        sock.settimeout(2.0)
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            while not stop_flag.is_set():
+                try:
+                    conn, _ = sock.accept()
+                except TimeoutError:
+                    continue
+                executor.submit(join_handler, conn)
 
 
 def sensors_listener(stop_flag):
