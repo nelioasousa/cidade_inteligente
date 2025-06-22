@@ -3,8 +3,10 @@ import threading
 import time
 import json
 import datetime
+import traceback
 from messages_pb2 import Address, SensorReading
 from messages_pb2 import JoinRequest, JoinReply
+from messages_pb2 import DeviceRequest, RequestType, DeviceReply
 
 
 GATEWAY_IP = socket.gethostbyname(socket.gethostname())
@@ -84,6 +86,7 @@ def sensors_listener():
             except Exception:
                 continue
             name = reading.sensor_name
+            print(reading)
             if name.startswith('Sensor-Temp'):
                 reading_value = float(reading.reading_value)
                 timestamp = datetime.datetime.fromisoformat(reading.timestamp)
@@ -93,9 +96,41 @@ def sensors_listener():
                 continue
 
 
+def make_requests(device_name):
+    device = DEVICES[device_name]
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.connect(device['address'])
+        sock.settimeout(5.0)
+        req = DeviceRequest(
+            type=RequestType.ACTION,
+            body='kelvin'
+        )
+        sock.send(req.SerializeToString())
+        reply = DeviceReply()
+        reply.ParseFromString(sock.recv(1024))
+        print(reply)
+        sock.shutdown(socket.SHUT_RDWR)
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.connect(device['address'])
+        sock.settimeout(5.0)
+        req = DeviceRequest(type=RequestType.GET_STATE)
+        sock.send(req.SerializeToString())
+        reply = DeviceReply()
+        reply.ParseFromString(sock.recv(1024))
+        print(reply)
+        sock.shutdown(socket.SHUT_RDWR)
+
+
 if __name__ == '__main__':
     threading.Thread(target=multicast_gateway_location, daemon=True).start()
     threading.Thread(target=join_listener, daemon=True).start()
     threading.Thread(target=sensors_listener, daemon=True).start()
     while True:
         time.sleep(10)
+        try:
+            make_requests('Sensor-Temp-01')
+        except Exception as e:
+            traceback.print_exc()
+            pass
