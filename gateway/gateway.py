@@ -3,10 +3,9 @@ import threading
 import time
 import json
 import datetime
-import traceback
+from google.protobuf import message
 from messages_pb2 import Address, SensorReading
 from messages_pb2 import JoinRequest, JoinReply
-from messages_pb2 import DeviceRequest, RequestType, DeviceReply
 
 
 GATEWAY_IP = socket.gethostbyname(socket.gethostname())
@@ -17,17 +16,17 @@ GATEWAY_ACTUATORS_PORT = 50333
 MULTICAST_ADDR = ('224.0.1.0', 12345)
 SENSORS_REPORT_INTERVAL = 1
 ACTUATORS_REPORT_INTERVAL = 5
-DEVICES = {}
+CONNECTED_DEVICES = {}
 
 
-def multicast_gateway_location(interval_sec=5):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
-    address = Address(ip=GATEWAY_IP, port=GATEWAY_JOIN_PORT)
-    while True:
-        sock.sendto(address.SerializeToString(), MULTICAST_ADDR)
-        time.sleep(interval_sec)
+def multicast_location(stop_flag, interval_sec=5.0):
+    addrs = Address(ip=GATEWAY_IP, port=GATEWAY_JOIN_PORT).SerializeToString()
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+        while not stop_flag.is_set():
+            sock.sendto(addrs, MULTICAST_ADDR)
+            time.sleep(interval_sec)
 
 
 def join_handler(sock):
@@ -46,8 +45,7 @@ def join_handler(sock):
                 'data': []
             }
             name = device_info['name']
-            if name not in DEVICES:
-                DEVICES[name] = device_info
+            CONNECTED_DEVICES[name] = device_info
             if name.startswith('Sensor'):
                 report_interval = SENSORS_REPORT_INTERVAL
                 report_address = Address(
@@ -66,34 +64,35 @@ def join_handler(sock):
             sock.shutdown(socket.SHUT_RDWR)
 
 
-def join_listener():
+def join_listener(stop_flag):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(('', GATEWAY_JOIN_PORT))
         sock.listen()
-        while True:
+        while not stop_flag.is_set():
             conn, _ = sock.accept()
             threading.Thread(target=join_handler, args=(conn,)).start()
 
 
-def sensors_listener():
+def sensors_listener(stop_flag):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.bind(('', GATEWAY_SENSORS_PORT))
-        while True:
+        while not stop_flag.is_set():
             msg, _ = sock.recvfrom(1024)
             try:
                 reading = SensorReading()
                 reading.ParseFromString(msg)
-            except Exception:
+            except message.DecodeError:
                 continue
             name = reading.sensor_name
-            print(reading)
+            try:
+                device = CONNECTED_DEVICES[name]
+            except KeyError:
+                continue
             if name.startswith('Sensor-Temp'):
                 reading_value = float(reading.reading_value)
                 timestamp = datetime.datetime.fromisoformat(reading.timestamp)
-                DEVICES[name]['data'].append((timestamp, reading_value))
-                DEVICES[name]['data'].sort(key=(lambda x: x[0]))
-            else:
-                continue
+                device['data'].append((timestamp, reading_value))
+                device['data'].sort(key=(lambda x: x[0]))
 
 
 # def make_requests(device_name):
@@ -124,8 +123,12 @@ def sensors_listener():
 
 
 if __name__ == '__main__':
-    threading.Thread(target=multicast_gateway_location, daemon=True).start()
-    threading.Thread(target=join_listener, daemon=True).start()
-    threading.Thread(target=sensors_listener, daemon=True).start()
-    while True:
-        time.sleep(10)
+    stop_flag = threading.Event()
+    try:
+        threading.Thread(target=multicast_location, args=(stop_flag,)).start()
+        threading.Thread(target=join_listener, args=(stop_flag,)).start()
+        threading.Thread(target=sensors_listener, args=(stop_flag,)).start()
+        while True:
+            time.sleep(10.0)
+    finally:
+        stop_flag.set()
