@@ -82,12 +82,13 @@ def join_listener(stop_flag, devices_lock):
 def sensors_listener(stop_flag, devices_lock):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.bind(('', GATEWAY_SENSORS_PORT))
+        sock.settimeout(2.0)
         while not stop_flag.is_set():
-            msg, _ = sock.recvfrom(1024)
             try:
+                msg, _ = sock.recvfrom(1024)
                 reading = SensorReading()
                 reading.ParseFromString(msg)
-            except message.DecodeError:
+            except (TimeoutError, message.DecodeError):
                 continue
             name = reading.sensor_name
             if not DB.is_device_registered(name):
