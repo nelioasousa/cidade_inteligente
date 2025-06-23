@@ -21,7 +21,7 @@ ACTUATORS_REPORT_INTERVAL = 5
 CONNECTED_DEVICES = {}
 
 
-def multicast_location(stop_flag, interval_sec=5.0):
+def multicast_location(stop_flag, interval_sec=2.5):
     addrs = Address(ip=GATEWAY_IP, port=GATEWAY_JOIN_PORT).SerializeToString()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

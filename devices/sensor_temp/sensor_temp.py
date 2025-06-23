@@ -19,8 +19,6 @@ DEVICE_PORT = 5000
 MULTICAST_ADDRS = ('224.0.1.0', 12345)
 BASE_TEMP = 20.0 + 20 * random.random()
 GATEWAY_ADDRS = None
-GATEWAY_TIMEOUT = 5.0
-MAX_ATTEMPTS = 5
 
 
 STATE = {
@@ -35,9 +33,21 @@ METADATA = {
 }
 
 
+def is_connected():
+    return GATEWAY_ADDRS is not None
+
+
+def get_remote():
+    if is_connected():
+        return GATEWAY_ADDRS[0]
+    return None
+
+
 def gateway_discoverer(stop_flag):
+    max_attempts = 3
+    gateway_timeout = 5.0
+    multicast_ip, multicast_port = MULTICAST_ADDRS
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        multicast_ip, multicast_port = MULTICAST_ADDRS
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(('', multicast_port))
         sock.setsockopt(
@@ -45,37 +55,44 @@ def gateway_discoverer(stop_flag):
             socket.IP_ADD_MEMBERSHIP,
             socket.inet_aton(multicast_ip) + socket.inet_aton('0.0.0.0')
         )
-        sock.settimeout(GATEWAY_TIMEOUT)
-        num_attempts = MAX_ATTEMPTS
+        sock.settimeout(gateway_timeout)
+        # Desconectar depois de 3 falhas consecutivas
+        fail_counter = 0
         while not stop_flag.is_set():
             try:
                 msg = sock.recv(1024)
             except TimeoutError:
-                print('Timeout no multicast')
-                num_attempts -= 1
-                # Gateway offline or failed
-                if num_attempts < 1:
-                    print('Gateway falhou, terminando tudo...')
-                    stop_flag.set()
-                    break
+                if is_connected():
+                    print(f'Falha do Gateway em {get_remote()}')
+                    fail_counter += 1
+                    if fail_counter >= max_attempts:
+                        print('Gateway offline. Desconectando sensor...')
+                        disconnect_device()
                 continue
             gateway_addrs = Address()
             gateway_addrs.ParseFromString(msg)
-            gateway_addrs = (gateway_addrs.ip, gateway_addrs.port)
-            if GATEWAY_ADDRS is None or GATEWAY_ADDRS[0] != gateway_addrs[0]:
-                if try_to_connect(gateway_addrs):
-                    print('Conexão bem-sucedida com', gateway_addrs)
-                    num_attempts = MAX_ATTEMPTS
+            if is_connected():
+                if gateway_addrs.ip == get_remote():
+                    continue
                 else:
-                    num_attempts -= 1
+                    print('Gateway realocado. Desconectando...')
+                    disconnect_device()
+            if try_to_connect((gateway_addrs.ip, gateway_addrs.port)):
+                fail_counter = 0
+                print(f'Conexão bem-sucedida com {gateway_addrs.ip}')
             else:
-                num_attempts = MAX_ATTEMPTS
+                print(f'Falha ao se conectar com {gateway_addrs.ip}')
+
+
+def disconnect_device():
+    global GATEWAY_ADDRS
+    GATEWAY_ADDRS = None
+    return
 
 
 def try_to_connect(addrs):
     print('Tentando conectar com', addrs)
     global GATEWAY_ADDRS
-    GATEWAY_ADDRS = None
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(5.0)
         try:
@@ -85,12 +102,12 @@ def try_to_connect(addrs):
         device_info = DeviceInfo(
             name=NAME,
             state=json.dumps(STATE),
-            metadata=json.dumps(METADATA)
+            metadata=json.dumps(METADATA),
         )
         device_address = Address(ip=DEVICE_IP, port=DEVICE_PORT)
         join_request = JoinRequest(
             device_info=device_info,
-            device_address=device_address
+            device_address=device_address,
         ).SerializeToString()
         try:
             sock.send(join_request)
@@ -125,6 +142,7 @@ def transmit_readings(stop_flag):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         while not stop_flag.is_set():
             if GATEWAY_ADDRS is None:
+                print('Transmissão parada. Sem conexão com o Gateway')
                 time.sleep(5.0)
             else:
                 reading = SensorReading(
