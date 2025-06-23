@@ -25,7 +25,6 @@ DB = Database()
 def multicast_location(stop_flag, interval_sec=2.5):
     addrs = Address(ip=GATEWAY_IP, port=GATEWAY_JOIN_PORT).SerializeToString()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
         while not stop_flag.is_set():
             sock.sendto(addrs, MULTICAST_ADDRS)
@@ -66,6 +65,7 @@ def join_handler(sock, devices_lock):
 
 def join_listener(stop_flag, devices_lock):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(('', GATEWAY_JOIN_PORT))
         sock.listen()
         print('Ouvindo requisições de ingresso')

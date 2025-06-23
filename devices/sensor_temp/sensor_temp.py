@@ -296,6 +296,7 @@ def request_handler(sock):
 
 def request_listener(stop_flag):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(('', DEVICE_PORT))
         sock.listen()
         print('Ouvindo requisições do gateway')
