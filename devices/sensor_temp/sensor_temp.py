@@ -276,14 +276,14 @@ def request_handler(sock):
             sock.close()
 
 
-def request_listener(stop_listening):
+def request_listener(stop_flag):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(('', DEVICE_PORT))
         sock.listen()
         print('Ouvindo requisições do gateway')
         sock.settimeout(2.0)
         with ThreadPoolExecutor(max_workers=10) as executor:
-            while not stop_listening.is_set():
+            while not stop_flag.is_set():
                 try:
                     conn, _ = sock.accept()
                 except TimeoutError:
