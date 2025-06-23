@@ -46,7 +46,6 @@ def join_handler(sock):
             'data': []
         }
         name = device_info['name']
-        CONNECTED_DEVICES[name] = device_info
         if name.startswith('Sensor'):
             report_interval = SENSORS_REPORT_INTERVAL
             report_port = GATEWAY_SENSORS_PORT
@@ -58,6 +57,7 @@ def join_handler(sock):
             report_address=report_address, report_interval=report_interval
         )
         sock.send(reply.SerializeToString())
+        CONNECTED_DEVICES[name] = device_info
     finally:
         sock.shutdown(socket.SHUT_RDWR)
         sock.close()
