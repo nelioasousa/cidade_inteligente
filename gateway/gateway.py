@@ -31,6 +31,7 @@ def multicast_location(stop_flag, interval_sec=5.0):
 
 
 def join_handler(sock):
+    print('Tratando pedido de ingresso')
     try:
         sock.settimeout(5.0)
         req = JoinRequest()
@@ -58,6 +59,7 @@ def join_handler(sock):
         )
         sock.send(reply.SerializeToString())
         CONNECTED_DEVICES[name] = device_info
+        print('Ingresso bem-sucedido:', name)
     finally:
         sock.shutdown(socket.SHUT_RDWR)
         sock.close()
@@ -67,6 +69,7 @@ def join_listener(stop_flag):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(('', GATEWAY_JOIN_PORT))
         sock.listen()
+        print('Ouvindo requisições de ingresso')
         sock.settimeout(2.0)
         with ThreadPoolExecutor(max_workers=10) as executor:
             while not stop_flag.is_set():
@@ -93,6 +96,7 @@ def sensors_listener(stop_flag):
             except KeyError:
                 continue
             if name.startswith('Sensor-Temp'):
+                print('Leitura de temperatura recebida')
                 reading_value = float(reading.reading_value)
                 timestamp = datetime.datetime.fromisoformat(reading.timestamp)
                 device['data'].append((timestamp, reading_value))

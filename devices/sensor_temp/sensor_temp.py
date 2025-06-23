@@ -51,6 +51,7 @@ def gateway_discoverer(stop_flag):
             try:
                 msg = sock.recv(1024)
             except TimeoutError:
+                print('Timeout no multicast')
                 num_attempts -= 1
                 # Gateway offline or failed
                 if num_attempts < 1:
@@ -62,6 +63,7 @@ def gateway_discoverer(stop_flag):
             gateway_addrs = (gateway_addrs.ip, gateway_addrs.port)
             if GATEWAY_ADDRS is None or GATEWAY_ADDRS[0] != gateway_addrs[0]:
                 if try_to_connect(gateway_addrs):
+                    print('Conexão bem-sucedida com', gateway_addrs)
                     num_attempts = MAX_ATTEMPTS
                 else:
                     num_attempts -= 1
@@ -70,6 +72,7 @@ def gateway_discoverer(stop_flag):
 
 
 def try_to_connect(addrs):
+    print('Tentando conectar com', addrs)
     global GATEWAY_ADDRS
     GATEWAY_ADDRS = None
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -117,6 +120,7 @@ def get_reading():
 
 
 def transmit_readings(stop_flag):
+    print('Começando a transmissão de leituras')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         while not stop_flag.is_set():
             if GATEWAY_ADDRS is None:
@@ -128,6 +132,7 @@ def transmit_readings(stop_flag):
                     timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
                 )
                 sock.sendto(reading.SerializeToString(), GATEWAY_ADDRS)
+                print('Leitura de temperatura enviada')
                 time.sleep(STATE['ReportInterval'])
 
 
@@ -273,6 +278,7 @@ def request_listener(stop_listening):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(('', DEVICE_PORT))
         sock.listen()
+        print('Ouvindo requisições do gateway')
         sock.settimeout(2.0)
         with ThreadPoolExecutor(max_workers=10) as executor:
             while not stop_listening.is_set():
