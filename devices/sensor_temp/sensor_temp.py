@@ -237,6 +237,7 @@ def set_metadata(metadata_string):
 
 
 def request_handler(sock):
+    print('Tratando requisição do Gateway')
     try:
         sock.settimeout(3.0)
         req = DeviceRequest()
@@ -295,7 +296,9 @@ if __name__ == '__main__':
     try:
         threading.Thread(target=request_listener, args=(stop_flag,)).start()
         threading.Thread(target=transmit_readings, args=(stop_flag,)).start()
-        threading.Thread(target=gateway_discoverer, args=(stop_flag,)).start()
+        discoverer = threading.Thread(target=gateway_discoverer, args=(stop_flag,))
+        discoverer.start()
+        discoverer.join()
     except:
         stop_flag.set()
         raise
