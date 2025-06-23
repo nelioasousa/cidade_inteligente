@@ -136,7 +136,6 @@ if __name__ == '__main__':
         threading.Thread(target=multicast_location, args=(stop_flag,)).start()
         threading.Thread(target=join_listener, args=(stop_flag,)).start()
         threading.Thread(target=sensors_listener, args=(stop_flag,)).start()
-        while True:
-            time.sleep(10.0)
-    finally:
+    except:
         stop_flag.set()
+        raise

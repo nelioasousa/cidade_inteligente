@@ -55,6 +55,7 @@ def gateway_discoverer(stop_flag):
                 num_attempts -= 1
                 # Gateway offline or failed
                 if num_attempts < 1:
+                    print('Gateway falhou, terminando tudo...')
                     stop_flag.set()
                     break
                 continue
@@ -295,7 +296,6 @@ if __name__ == '__main__':
         threading.Thread(target=request_listener, args=(stop_flag,)).start()
         threading.Thread(target=transmit_readings, args=(stop_flag,)).start()
         threading.Thread(target=gateway_discoverer, args=(stop_flag,)).start()
-        while True:
-            time.sleep(10.0)
-    finally:
+    except:
         stop_flag.set()
+        raise
