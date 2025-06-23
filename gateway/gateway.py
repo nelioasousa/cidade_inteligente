@@ -3,6 +3,7 @@ import threading
 import time
 import json
 import datetime
+from db import Database
 from concurrent.futures import ThreadPoolExecutor
 from google.protobuf import message
 from messages_pb2 import Address, SensorReading
@@ -18,7 +19,7 @@ GATEWAY_ACTUATORS_PORT = 50333
 MULTICAST_ADDRS = ('224.0.1.0', 12345)
 SENSORS_REPORT_INTERVAL = 1
 ACTUATORS_REPORT_INTERVAL = 5
-CONNECTED_DEVICES = {}
+DB = Database()
 
 
 def multicast_location(stop_flag, interval_sec=2.5):
@@ -38,15 +39,6 @@ def join_handler(sock, devices_lock):
         req = JoinRequest()
         req.ParseFromString(sock.recv(1024))
         name = req.device_info.name
-        device_info = {
-            'name': name,
-            'address': (req.device_address.ip, req.device_address.port),
-            'state': json.loads(req.device_info.state),
-            'metadata': json.loads(req.device_info.metadata),
-            'last_seen': time.monotonic(),
-            'online': True,
-            'data': [],
-        }
         if name.startswith('Sensor'):
             report_interval = SENSORS_REPORT_INTERVAL
             report_port = GATEWAY_SENSORS_PORT
@@ -60,9 +52,12 @@ def join_handler(sock, devices_lock):
             ).SerializeToString()
         )
         with devices_lock:
-            if name in CONNECTED_DEVICES:
-                device_info['data'] = CONNECTED_DEVICES[name]['data']
-            CONNECTED_DEVICES[name] = device_info
+            DB.register_decive(
+                name=name,
+                address=(req.device_address.ip, req.device_address.port),
+                state_json=json.loads(req.device_info.state),
+                metadata_json=json.loads(req.device_info.metadata),
+            )
         print(f'Ingresso bem-sucedido: {name}')
     finally:
         sock.shutdown(socket.SHUT_RDWR)
@@ -95,9 +90,7 @@ def sensors_listener(stop_flag, devices_lock):
             except message.DecodeError:
                 continue
             name = reading.sensor_name
-            try:
-                device = CONNECTED_DEVICES[name]
-            except KeyError:
+            if not DB.is_device_registered(name):
                 continue
             if name.startswith('Sensor-Temp'):
                 print('Leitura de temperatura recebida')
@@ -105,14 +98,13 @@ def sensors_listener(stop_flag, devices_lock):
                 timestamp = datetime.datetime.fromisoformat(reading.timestamp)
                 data_item = (timestamp, reading_value)
             with devices_lock:
-                device['last_seen'] = time.monotonic()
-                device['online'] = True
-                device['data'].append(data_item)
+                DB.insert_data_item(name, data_item)
 
 
 def simulate_requests():
-    device = CONNECTED_DEVICES['Sensor-Temp-01']
-
+    device = DB.get_device('Sensor-Temp-01')
+    if device is None:
+        return
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         print('Requisitando AÇÃO')
         sock.connect(device['address'])
@@ -126,7 +118,6 @@ def simulate_requests():
         reply.ParseFromString(sock.recv(1024))
         print(f'Resultado da requisição: {reply.status}')
         sock.shutdown(socket.SHUT_RDWR)
-
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         print('Requisitando estado do dispositivo')
         sock.connect(device['address'])
@@ -143,19 +134,30 @@ if __name__ == '__main__':
     stop_flag = threading.Event()
     devices_lock = threading.Lock()
     try:
-        threading.Thread(
+        jlistener = threading.Thread(
             target=join_listener, args=(stop_flag, devices_lock)
-        ).start()
-        threading.Thread(
+        )
+        slistener = threading.Thread(
             target=sensors_listener, args=(stop_flag, devices_lock)
-        ).start()
-        multicaster = threading.Thread(target=multicast_location, args=(stop_flag,))
+        )
+        multicaster = threading.Thread(
+            target=multicast_location, args=(stop_flag,)
+        )
+        jlistener.start()
+        slistener.start()
         multicaster.start()
         while True:
-            if CONNECTED_DEVICES:
+            time.sleep(10.0)
+            if DB.has_data():
                 simulate_requests()
-                break
-        multicaster.join()
-    except:
+    except BaseException as e:
         stop_flag.set()
-        raise
+        if isinstance(e, KeyboardInterrupt):
+            print('DESLIGANDO...')
+        else:
+            raise e
+    finally:
+        multicaster.join()
+        slistener.join()
+        jlistener.join()
+        DB.persist()

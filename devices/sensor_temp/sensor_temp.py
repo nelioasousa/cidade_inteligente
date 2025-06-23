@@ -312,11 +312,17 @@ def request_listener(stop_flag):
 if __name__ == '__main__':
     stop_flag = threading.Event()
     try:
-        threading.Thread(target=request_listener, args=(stop_flag,)).start()
-        threading.Thread(target=transmit_readings, args=(stop_flag,)).start()
-        discoverer = threading.Thread(target=gateway_discoverer, args=(stop_flag,))
-        discoverer.start()
-        discoverer.join()
-    except:
+        rlistener = threading.Thread(target=request_listener, args=(stop_flag,))
+        transmiter = threading.Thread(target=transmit_readings, args=(stop_flag,))
+        rlistener.start()
+        transmiter.start()
+        gateway_discoverer(stop_flag)
+    except BaseException as e:
         stop_flag.set()
-        raise
+        if isinstance(e, KeyboardInterrupt):
+            print('DESLIGANDO...')
+        else:
+            raise e
+    finally:
+        rlistener.join()
+        transmiter.join()
