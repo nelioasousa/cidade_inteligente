@@ -14,7 +14,7 @@ GATEWAY_CLIENT_PORT = 5000
 GATEWAY_JOIN_PORT = 50111
 GATEWAY_SENSORS_PORT = 50222
 GATEWAY_ACTUATORS_PORT = 50333
-MULTICAST_ADDR = ('224.0.1.0', 12345)
+MULTICAST_ADDRS = ('224.0.1.0', 12345)
 SENSORS_REPORT_INTERVAL = 1
 ACTUATORS_REPORT_INTERVAL = 5
 CONNECTED_DEVICES = {}
@@ -26,7 +26,7 @@ def multicast_location(stop_flag, interval_sec=5.0):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
         while not stop_flag.is_set():
-            sock.sendto(addrs, MULTICAST_ADDR)
+            sock.sendto(addrs, MULTICAST_ADDRS)
             time.sleep(interval_sec)
 
 

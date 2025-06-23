@@ -16,9 +16,9 @@ from google.protobuf import message
 NAME = 'Sensor-Temp-01'
 DEVICE_IP = socket.gethostbyname(socket.gethostname())
 DEVICE_PORT = 5000
-MULTICAST_ADDR = ('224.0.1.0', 12345)
+MULTICAST_ADDRS = ('224.0.1.0', 12345)
 BASE_TEMP = 20.0 + 20 * random.random()
-GATEWAY_ADDR = None
+GATEWAY_ADDRS = None
 GATEWAY_TIMEOUT = 5.0
 MAX_ATTEMPTS = 5
 
@@ -37,7 +37,7 @@ METADATA = {
 
 def gateway_discoverer(stop_flag):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        multicast_ip, multicast_port = MULTICAST_ADDR
+        multicast_ip, multicast_port = MULTICAST_ADDRS
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(('', multicast_port))
         sock.setsockopt(
@@ -60,7 +60,7 @@ def gateway_discoverer(stop_flag):
             gateway_addrs = Address()
             gateway_addrs.ParseFromString(msg)
             gateway_addrs = (gateway_addrs.ip, gateway_addrs.port)
-            if GATEWAY_ADDR is None or GATEWAY_ADDR[0] != gateway_addrs[0]:
+            if GATEWAY_ADDRS is None or GATEWAY_ADDRS[0] != gateway_addrs[0]:
                 if try_to_connect(gateway_addrs):
                     num_attempts = MAX_ATTEMPTS
                 else:
@@ -70,8 +70,8 @@ def gateway_discoverer(stop_flag):
 
 
 def try_to_connect(addrs):
-    global GATEWAY_ADDR
-    GATEWAY_ADDR = None
+    global GATEWAY_ADDRS
+    GATEWAY_ADDRS = None
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(5.0)
         try:
@@ -100,7 +100,7 @@ def try_to_connect(addrs):
         join_reply.ParseFromString(msg)
     report_addrs = join_reply.report_address
     report_interval = join_reply.report_interval
-    GATEWAY_ADDR = (report_addrs.ip, report_addrs.port)
+    GATEWAY_ADDRS = (report_addrs.ip, report_addrs.port)
     STATE['ReportInterval'] = report_interval
     return True
 
@@ -119,7 +119,7 @@ def get_reading():
 def transmit_readings(stop_flag):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         while not stop_flag.is_set():
-            if GATEWAY_ADDR is None:
+            if GATEWAY_ADDRS is None:
                 time.sleep(5.0)
             else:
                 reading = SensorReading(
@@ -127,7 +127,7 @@ def transmit_readings(stop_flag):
                     reading_value=f'{get_reading():.2f}',
                     timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
                 )
-                sock.sendto(reading.SerializeToString(), GATEWAY_ADDR)
+                sock.sendto(reading.SerializeToString(), GATEWAY_ADDRS)
                 time.sleep(STATE['ReportInterval'])
 
 
@@ -135,8 +135,8 @@ def exec_action(action):
     status = ReplyStatus.OK
     match action.strip().lower():
         case 'reset':
-            global GATEWAY_ADDR
-            GATEWAY_ADDR = None
+            global GATEWAY_ADDRS
+            GATEWAY_ADDRS = None
             STATE['ReportInterval'] = None
             METADATA['UnitName'] = 'Celsius'
             METADATA['UnitSymbol'] = '°C'
