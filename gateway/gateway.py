@@ -31,23 +31,22 @@ def multicast_location(stop_flag, interval_sec=2.5):
             time.sleep(interval_sec)
 
 
-def join_handler(sock):
+def join_handler(sock, devices_lock):
     print('Tratando pedido de ingresso')
     try:
         sock.settimeout(5.0)
         req = JoinRequest()
         req.ParseFromString(sock.recv(1024))
-    except Exception:
-        return
-    else:
+        name = req.device_info.name
         device_info = {
-            'name': req.device_info.name,
+            'name': name,
             'address': (req.device_address.ip, req.device_address.port),
             'state': json.loads(req.device_info.state),
             'metadata': json.loads(req.device_info.metadata),
-            'data': []
+            'last_seen': time.monotonic(),
+            'online': True,
+            'data': [],
         }
-        name = device_info['name']
         if name.startswith('Sensor'):
             report_interval = SENSORS_REPORT_INTERVAL
             report_port = GATEWAY_SENSORS_PORT
@@ -55,18 +54,22 @@ def join_handler(sock):
             report_interval = ACTUATORS_REPORT_INTERVAL
             report_port = GATEWAY_ACTUATORS_PORT
         report_address = Address(ip=GATEWAY_IP, port=report_port)
-        reply = JoinReply(
-            report_address=report_address, report_interval=report_interval
+        sock.send(
+            JoinReply(
+                report_address=report_address, report_interval=report_interval
+            ).SerializeToString()
         )
-        sock.send(reply.SerializeToString())
-        CONNECTED_DEVICES[name] = device_info
-        print('Ingresso bem-sucedido:', name)
+        with devices_lock:
+            if name in CONNECTED_DEVICES:
+                device_info['data'] = CONNECTED_DEVICES[name]['data']
+            CONNECTED_DEVICES[name] = device_info
+        print(f'Ingresso bem-sucedido: {name}')
     finally:
         sock.shutdown(socket.SHUT_RDWR)
         sock.close()
 
 
-def join_listener(stop_flag):
+def join_listener(stop_flag, devices_lock):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(('', GATEWAY_JOIN_PORT))
         sock.listen()
@@ -78,10 +81,10 @@ def join_listener(stop_flag):
                     conn, _ = sock.accept()
                 except TimeoutError:
                     continue
-                executor.submit(join_handler, conn)
+                executor.submit(join_handler, conn, devices_lock)
 
 
-def sensors_listener(stop_flag):
+def sensors_listener(stop_flag, devices_lock):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.bind(('', GATEWAY_SENSORS_PORT))
         while not stop_flag.is_set():
@@ -100,8 +103,11 @@ def sensors_listener(stop_flag):
                 print('Leitura de temperatura recebida')
                 reading_value = float(reading.reading_value)
                 timestamp = datetime.datetime.fromisoformat(reading.timestamp)
-                device['data'].append((timestamp, reading_value))
-                device['data'].sort(key=(lambda x: x[0]))
+                data_item = (timestamp, reading_value)
+            with devices_lock:
+                device['last_seen'] = time.monotonic()
+                device['online'] = True
+                device['data'].append(data_item)
 
 
 def simulate_requests():
@@ -135,9 +141,14 @@ def simulate_requests():
 
 if __name__ == '__main__':
     stop_flag = threading.Event()
+    devices_lock = threading.Lock()
     try:
-        threading.Thread(target=join_listener, args=(stop_flag,)).start()
-        threading.Thread(target=sensors_listener, args=(stop_flag,)).start()
+        threading.Thread(
+            target=join_listener, args=(stop_flag, devices_lock)
+        ).start()
+        threading.Thread(
+            target=sensors_listener, args=(stop_flag, devices_lock)
+        ).start()
         multicaster = threading.Thread(target=multicast_location, args=(stop_flag,))
         multicaster.start()
         while True:
