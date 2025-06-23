@@ -19,6 +19,8 @@ DEVICE_PORT = 5000
 MULTICAST_ADDR = ('224.0.1.0', 12345)
 BASE_TEMP = 20.0 + 20 * random.random()
 GATEWAY_ADDR = None
+GATEWAY_TIMEOUT = 5.0
+MAX_ATTEMPTS = 5
 
 
 STATE = {
@@ -33,37 +35,74 @@ METADATA = {
 }
 
 
-def discover_gateway():
-    global GATEWAY_ADDR
-    GATEWAY_ADDR = None
-    STATE['ReportInterval'] = None
+def gateway_discoverer(stop_flag):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        multicast_ip, multicast_port = MULTICAST_ADDR
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(('', MULTICAST_ADDR[1]))
+        sock.bind(('', multicast_port))
         sock.setsockopt(
             socket.IPPROTO_IP,
             socket.IP_ADD_MEMBERSHIP,
-            socket.inet_aton(MULTICAST_ADDR[0]) + socket.inet_aton('0.0.0.0')
+            socket.inet_aton(multicast_ip) + socket.inet_aton('0.0.0.0')
         )
-        gateway_addrs = Address()
-        gateway_addrs.ParseFromString(sock.recv(1024))
-        GATEWAY_ADDR = (gateway_addrs.ip, gateway_addrs.port)
-    device_info = DeviceInfo(
-        name=NAME, state=json.dumps(STATE), metadata=json.dumps(METADATA)
-    )
-    device_address = Address(ip=DEVICE_IP, port=DEVICE_PORT)
-    join_request = JoinRequest(
-        device_info=device_info, device_address=device_address
-    )
+        sock.settimeout(GATEWAY_TIMEOUT)
+        num_attempts = MAX_ATTEMPTS
+        while not stop_flag.is_set():
+            try:
+                msg = sock.recv(1024)
+            except TimeoutError:
+                num_attempts -= 1
+                # Gateway offline or failed
+                if num_attempts < 1:
+                    stop_flag.set()
+                    break
+                continue
+            gateway_addrs = Address()
+            gateway_addrs.ParseFromString(msg)
+            gateway_addrs = (gateway_addrs.ip, gateway_addrs.port)
+            if GATEWAY_ADDR is None or GATEWAY_ADDR[0] != gateway_addrs[0]:
+                if try_to_connect(gateway_addrs):
+                    num_attempts = MAX_ATTEMPTS
+                else:
+                    num_attempts -= 1
+            else:
+                num_attempts = MAX_ATTEMPTS
+
+
+def try_to_connect(addrs):
+    global GATEWAY_ADDR
+    GATEWAY_ADDR = None
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect(GATEWAY_ADDR)
-        sock.send(join_request.SerializeToString())
-        join_reply = JoinReply()
-        join_reply.ParseFromString(sock.recv(1024))
-        GATEWAY_ADDR = (
-            join_reply.report_address.ip, join_reply.report_address.port
+        sock.settimeout(5.0)
+        try:
+            sock.connect(addrs)
+        except Exception:
+            return False
+        device_info = DeviceInfo(
+            name=NAME,
+            state=json.dumps(STATE),
+            metadata=json.dumps(METADATA)
         )
-        STATE['ReportInterval'] = join_reply.report_interval
+        device_address = Address(ip=DEVICE_IP, port=DEVICE_PORT)
+        join_request = JoinRequest(
+            device_info=device_info,
+            device_address=device_address
+        ).SerializeToString()
+        try:
+            sock.send(join_request)
+        except Exception:
+            return False
+        try:
+            msg = sock.recv(1024)
+        except Exception:
+            return False
+        join_reply = JoinReply()
+        join_reply.ParseFromString(msg)
+    report_addrs = join_reply.report_address
+    report_interval = join_reply.report_interval
+    GATEWAY_ADDR = (report_addrs.ip, report_addrs.port)
+    STATE['ReportInterval'] = report_interval
+    return True
 
 
 def get_reading():
@@ -77,16 +116,19 @@ def get_reading():
     return temp
 
 
-def transmit_readings():
+def transmit_readings(stop_flag):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        while GATEWAY_ADDR is not None and STATE['ReportInterval'] is not None:
-            reading = SensorReading(
-                sensor_name=NAME,
-                reading_value='%.2f' %get_reading(),
-                timestamp=datetime.datetime.now(tz=datetime.UTC).isoformat(),
-            )
-            sock.sendto(reading.SerializeToString(), GATEWAY_ADDR)
-            time.sleep(STATE['ReportInterval'])
+        while not stop_flag.is_set():
+            if GATEWAY_ADDR is None:
+                time.sleep(5.0)
+            else:
+                reading = SensorReading(
+                    sensor_name=NAME,
+                    reading_value=f'{get_reading():.2f}',
+                    timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
+                )
+                sock.sendto(reading.SerializeToString(), GATEWAY_ADDR)
+                time.sleep(STATE['ReportInterval'])
 
 
 def exec_action(action):
@@ -241,18 +283,13 @@ def request_listener(stop_listening):
                 executor.submit(request_handler, conn)
 
 
-def run():
-    stop_listening = threading.Event()
-    try:
-        listener = threading.Thread(target=request_listener, args=(stop_listening,))
-        listener.start()
-        while True:
-            discover_gateway()
-            transmit_readings()
-    finally:
-        stop_listening.set()
-        listener.join()
-
-
 if __name__ == '__main__':
-    run()
+    stop_flag = threading.Event()
+    try:
+        threading.Thread(target=request_listener, args=(stop_flag,)).start()
+        threading.Thread(target=transmit_readings, args=(stop_flag,)).start()
+        threading.Thread(target=gateway_discoverer, args=(stop_flag,)).start()
+        while True:
+            time.sleep(10.0)
+    finally:
+        stop_flag.set()
