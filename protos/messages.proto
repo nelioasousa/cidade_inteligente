@@ -19,7 +19,7 @@ message JoinRequest {
 
 message JoinReply {
   Address report_address = 1;
-  uint32 report_interval = 2;
+  float report_interval = 2;
 }
 
 message SensorReading {

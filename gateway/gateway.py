@@ -11,47 +11,37 @@ from messages_pb2 import JoinRequest, JoinReply
 from messages_pb2 import DeviceRequest, DeviceReply, RequestType
 
 
-GATEWAY_IP = socket.gethostbyname(socket.gethostname())
-GATEWAY_CLIENT_PORT = 5000
-GATEWAY_JOIN_PORT = 50111
-GATEWAY_SENSORS_PORT = 50222
-GATEWAY_ACTUATORS_PORT = 50333
-MULTICAST_ADDRS = ('224.0.1.0', 12345)
-SENSORS_REPORT_INTERVAL = 1
-ACTUATORS_REPORT_INTERVAL = 5
-DB = Database()
-
-
-def multicast_location(stop_flag, interval_sec=2.5):
-    addrs = Address(ip=GATEWAY_IP, port=GATEWAY_JOIN_PORT).SerializeToString()
+def multicast_location(args):
+    addrs = Address(ip=args.host_ip, port=args.registration_port)
+    addrs = addrs.SerializeToString()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
-        while not stop_flag.is_set():
-            sock.sendto(addrs, MULTICAST_ADDRS)
-            time.sleep(interval_sec)
+        while not args.stop_flag.is_set():
+            sock.sendto(addrs, (args.multicast_ip, args.multicast_port))
+            time.sleep(args.multicast_interval)
 
 
-def join_handler(sock, devices_lock):
+def join_handler(args, sock):
     print('Tratando pedido de ingresso')
     try:
-        sock.settimeout(5.0)
+        sock.settimeout(args.base_timeout)
         req = JoinRequest()
         req.ParseFromString(sock.recv(1024))
         name = req.device_info.name
         if name.startswith('Sensor'):
-            report_interval = SENSORS_REPORT_INTERVAL
-            report_port = GATEWAY_SENSORS_PORT
+            report_interval = args.sensors_report_interval
+            report_port = args.sensors_port
         else:
-            report_interval = ACTUATORS_REPORT_INTERVAL
-            report_port = GATEWAY_ACTUATORS_PORT
-        report_address = Address(ip=GATEWAY_IP, port=report_port)
+            report_interval = args.actuators_report_interval
+            report_port = args.actuators_port
+        report_address = Address(ip=args.host_ip, port=report_port)
         sock.send(
             JoinReply(
                 report_address=report_address, report_interval=report_interval
             ).SerializeToString()
         )
-        with devices_lock:
-            DB.register_decive(
+        with args.db_lock:
+            args.db.register_decive(
                 name=name,
                 address=(req.device_address.ip, req.device_address.port),
                 state_json=json.loads(req.device_info.state),
@@ -63,27 +53,27 @@ def join_handler(sock, devices_lock):
         sock.close()
 
 
-def join_listener(stop_flag, devices_lock):
+def join_listener(args):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(('', GATEWAY_JOIN_PORT))
+        sock.bind(('', args.registration_port))
         sock.listen()
         print('Ouvindo requisições de ingresso')
-        sock.settimeout(2.0)
+        sock.settimeout(args.base_timeout)
         with ThreadPoolExecutor(max_workers=10) as executor:
-            while not stop_flag.is_set():
+            while not args.stop_flag.is_set():
                 try:
                     conn, _ = sock.accept()
                 except TimeoutError:
                     continue
-                executor.submit(join_handler, conn, devices_lock)
+                executor.submit(join_handler, args, conn)
 
 
-def sensors_listener(stop_flag, devices_lock):
+def sensors_listener(args):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.bind(('', GATEWAY_SENSORS_PORT))
-        sock.settimeout(2.0)
-        while not stop_flag.is_set():
+        sock.bind(('', args.sensors_port))
+        sock.settimeout(args.base_timeout)
+        while not args.stop_flag.is_set():
             try:
                 msg, _ = sock.recvfrom(1024)
                 reading = SensorReading()
@@ -91,25 +81,25 @@ def sensors_listener(stop_flag, devices_lock):
             except (TimeoutError, message.DecodeError):
                 continue
             name = reading.sensor_name
-            if not DB.is_device_registered(name):
+            if not args.db.is_device_registered(name):
                 continue
             if name.startswith('Sensor-Temp'):
                 print('Leitura de temperatura recebida')
                 reading_value = float(reading.reading_value)
                 timestamp = datetime.datetime.fromisoformat(reading.timestamp)
                 data_item = (timestamp, reading_value)
-            with devices_lock:
-                DB.insert_data_item(name, data_item)
+            with args.db_lock:
+                args.db.insert_data_item(name, data_item)
 
 
-def simulate_requests():
-    device = DB.get_device('Sensor-Temp-01')
+def simulate_requests(args):
+    device = args.db.get_device('Sensor-Temp-01')
     if device is None:
         return
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        print('Requisitando AÇÃO')
+        print('Ação: mudar para Kelvin')
         sock.connect(device['address'])
-        sock.settimeout(5.0)
+        sock.settimeout(args.base_timeout)
         req = DeviceRequest(
             type=RequestType.ACTION,
             body='kelvin'
@@ -117,12 +107,12 @@ def simulate_requests():
         sock.send(req.SerializeToString())
         reply = DeviceReply()
         reply.ParseFromString(sock.recv(1024))
-        print(f'Resultado da requisição: {reply.status}')
+        print(f'Ação bem-sucedida? {reply.status}')
         sock.shutdown(socket.SHUT_RDWR)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         print('Requisitando estado do dispositivo')
         sock.connect(device['address'])
-        sock.settimeout(5.0)
+        sock.settimeout(args.base_timeout)
         req = DeviceRequest(type=RequestType.GET_STATE)
         sock.send(req.SerializeToString())
         reply = DeviceReply()
@@ -131,28 +121,27 @@ def simulate_requests():
         sock.shutdown(socket.SHUT_RDWR)
 
 
-if __name__ == '__main__':
-    stop_flag = threading.Event()
-    devices_lock = threading.Lock()
+
+def _run(args):
     try:
         jlistener = threading.Thread(
-            target=join_listener, args=(stop_flag, devices_lock)
+            target=join_listener, args=(args,)
         )
         slistener = threading.Thread(
-            target=sensors_listener, args=(stop_flag, devices_lock)
+            target=sensors_listener, args=(args,)
         )
         multicaster = threading.Thread(
-            target=multicast_location, args=(stop_flag,)
+            target=multicast_location, args=(args,)
         )
         jlistener.start()
         slistener.start()
         multicaster.start()
         while True:
             time.sleep(10.0)
-            if DB.has_data():
-                simulate_requests()
+            if args.db.has_data():
+                simulate_requests(args)
     except BaseException as e:
-        stop_flag.set()
+        args.stop_flag.set()
         if isinstance(e, KeyboardInterrupt):
             print('DESLIGANDO...')
         else:
@@ -161,4 +150,68 @@ if __name__ == '__main__':
         multicaster.join()
         slistener.join()
         jlistener.join()
-        DB.persist()
+        args.db.persist()
+
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Gateway')
+
+    parser.add_argument(
+        '--clients_port', type=int, default=50111,
+        help='Porta para comunicação com os clientes. Usa TCP.'
+    )
+
+    parser.add_argument(
+        '--registration_port', type=int, default=50111,
+        help='Porta em que os dispositivos se registram no Gateway. Usa TCP.'
+    )
+
+    parser.add_argument(
+        '--sensors_port', type=int, default=50222,
+        help='Porta de recebimento de dados sensoriais. Usa UDP.'
+    )
+
+    parser.add_argument(
+        '--actuators_port', type=int, default=50333,
+        help='Porta de recebimento dos dados dos atuadores. Usa UDP.'
+    )
+
+    parser.add_argument(
+        '--multicast_ip', type=str, default='224.0.1.0',
+        help='IP para multicast do endereço do Gateway.'
+    )
+
+    parser.add_argument(
+        '--multicast_port', type=int, default=12345,
+        help='Porta para multicast do endereço do Gateway.'
+    )
+
+    parser.add_argument(
+        '--multicast_interval', type=float, default=2.5,
+        help='Intervalo de envio do endereço do Gateway para o grupo multicast.'
+    )
+
+    parser.add_argument(
+        '--sensors_report_interval', type=float, default=1.0,
+        help='Intervalo de envio de dados dos sensores.'
+    )
+
+    parser.add_argument(
+        '--actuators_report_interval', type=float, default=5.0,
+        help='Intervalo de envio de dados dos atuadores.'
+    )
+
+    args = parser.parse_args()
+    args.base_timeout = 2.5
+    args.host_ip = socket.gethostbyname(socket.gethostname())
+    args.db = Database()
+    args.stop_flag = threading.Event()
+    args.db_lock = threading.Lock()
+
+    return _run(args)
+
+
+if __name__ == '__main__':
+    main()
