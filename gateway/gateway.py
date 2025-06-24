@@ -143,7 +143,7 @@ def _run(args):
     except BaseException as e:
         args.stop_flag.set()
         if isinstance(e, KeyboardInterrupt):
-            print('DESLIGANDO...')
+            print('\rDESLIGANDO...')
         else:
             raise e
     finally:

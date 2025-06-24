@@ -321,7 +321,7 @@ if __name__ == '__main__':
     except BaseException as e:
         stop_flag.set()
         if isinstance(e, KeyboardInterrupt):
-            print('DESLIGANDO...')
+            print('\rDESLIGANDO...')
         else:
             raise e
     finally:
