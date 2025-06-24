@@ -121,7 +121,6 @@ def simulate_requests(args):
         sock.shutdown(socket.SHUT_RDWR)
 
 
-
 def _run(args):
     try:
         jlistener = threading.Thread(
