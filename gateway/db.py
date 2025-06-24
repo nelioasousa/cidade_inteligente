@@ -35,7 +35,6 @@ class Database:
         device['address'] = address
         device['state'] = state_json
         device['last_seen'] = time.monotonic()
-        device['online'] = True
         device.setdefault('data', [])
     
     def unregister_device(self, name):
@@ -61,7 +60,6 @@ class Database:
         device = self.db[name]
         device['data'].append(data_item)
         device['last_seen'] = time.monotonic()
-        device['online'] = True
         if sork_key is not None:
             device['data'].sort(key=sork_key)
     
