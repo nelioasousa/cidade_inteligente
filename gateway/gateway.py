@@ -2,7 +2,6 @@ import socket
 import threading
 import time
 import json
-import datetime
 from db import Database
 from concurrent.futures import ThreadPoolExecutor
 from google.protobuf import message
@@ -85,8 +84,7 @@ def sensors_listener(args):
             if name.startswith('Sensor-Temp'):
                 print('Leitura de temperatura recebida')
                 reading_value = float(reading.reading_value)
-                timestamp = datetime.datetime.fromisoformat(reading.timestamp)
-                data_item = (timestamp, reading_value)
+                data_item = (reading.timestamp, reading_value)
             with args.db_lock:
                 args.db.insert_data_item(name, data_item)
 

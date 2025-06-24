@@ -1,14 +1,6 @@
 import os
 import time
 import json
-import datetime
-
-
-def default_parser(obj):
-    try:
-        return obj.isoformat()
-    except ArithmeticError:
-        return str(obj)
 
 
 class Database:
@@ -23,10 +15,6 @@ class Database:
                     self.db = json.load(f)
                 for device in self.db:
                     self.db[device]['address'] = tuple(self.db[device]['address'])
-                    self.db[device]['data'] = [
-                        (datetime.datetime.fromisoformat(ts), vl)
-                        for ts, vl in self.db[device]['data']
-                    ]
             else:
                 self.db = {}
     
@@ -41,8 +29,8 @@ class Database:
         return self.db.pop(name, {})
     
     def persist(self):
-        with open(self.db_file, mode='w') as db:
-            json.dump(self.db, db, default=default_parser)
+        with open(self.db_file, mode='w') as db_file:
+            json.dump(self.db, db_file)
     
     def get_device(self, name):
         try:
