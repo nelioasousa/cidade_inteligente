@@ -118,29 +118,6 @@ def transmit_readings(args):
                 time.sleep(args.state['ReportInterval'])
 
 
-def exec_action(args, action):
-    status = ReplyStatus.OK
-    match action.strip().lower():
-        case 'reset':
-            args.gateway_ip = None
-            args.transmission_port = None
-            args.state['ReportInterval'] = None
-            args.state['UnitName'] = 'Celsius'
-            args.state['UnitSymbol'] = '°C'
-        case 'celsius':
-            args.state['UnitName'] = 'Celsius'
-            args.state['UnitSymbol'] = '°C'
-        case 'fahrenheit':
-            args.state['UnitName'] = 'Fahrenheit'
-            args.state['UnitSymbol'] = 'F'
-        case 'kelvin':
-            args.state['UnitName'] = 'Kelvin'
-            args.state['UnitSymbol'] = 'K'
-        case _:
-            status = ReplyStatus.UNKNOWN_ACTION
-    return status, ''
-
-
 def set_state(args, new_state_string):
     try:
         new_state = json.loads(new_state_string)
@@ -156,9 +133,6 @@ def set_state(args, new_state_string):
         status = ReplyStatus.BAD_REQUEST
         body = 'Corpo da requisição precisar ser um objeto JSON.'
         return status, body
-    if 'Actions' in new_state:
-        status = ReplyStatus.DENIED
-        body = '"Actions" é readonly'
     if 'ReportInterval' in new_state:
         report_interval = new_state['ReportInterval']
         if not isinstance(report_interval, Real) or report_interval <= 0.0:
@@ -204,7 +178,8 @@ def request_handler(args, sock):
         req.ParseFromString(sock.recv(1024))
         match req.type:
             case RequestType.ACTION:
-                status, body = exec_action(args, req.body)
+                status = ReplyStatus.BAD_REQUEST
+                body = 'Sensor não realiza ações'
             case RequestType.GET_STATE:
                 status = ReplyStatus.OK
                 body = json.dumps(args.state)
@@ -318,7 +293,6 @@ def main():
     args.transmission_port = None
     args.state = {
         'ReportInterval': None,
-        'Actions': ('reset', 'celsius', 'fahrenheit', 'kelvin'),
         'UnitName': 'Celsius',
         'UnitSymbol': '°C',
         'Location': {'Latitude': -3.733486, 'Longitude': -38.570860},

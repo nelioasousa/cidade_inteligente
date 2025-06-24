@@ -96,17 +96,14 @@ def simulate_requests(args):
     if device is None:
         return
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        print('Ação: mudar para Kelvin')
+        print('Solicitar ação do sensor')
         sock.connect(device['address'])
         sock.settimeout(args.base_timeout)
-        req = DeviceRequest(
-            type=RequestType.ACTION,
-            body='kelvin'
-        )
+        req = DeviceRequest(type=RequestType.ACTION, body='')
         sock.send(req.SerializeToString())
         reply = DeviceReply()
         reply.ParseFromString(sock.recv(1024))
-        print(f'Ação bem-sucedida? {reply.status}')
+        print(f'Ação bem-sucedida? {reply.status}: {reply.body}')
         sock.shutdown(socket.SHUT_RDWR)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         print('Requisitando estado do dispositivo')
