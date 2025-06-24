@@ -42,10 +42,10 @@ message DeviceRequest {
 enum ReplyStatus {
   RS_UNSPECIFIED = 0;
   OK = 1;
-  BAD_REQUEST = 2;
-  FAIL = 3;
-  DENIED = 4;
-  TIMEOUT = 5;
+  TIMEOUT = 2;
+  DENIED = 3;
+  FAIL = 4;
+  BAD_REQUEST = 5;
   UNKNOWN_TYPE = 6;
   UNKNOWN_ACTION = 7;
 }
