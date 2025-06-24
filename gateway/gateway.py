@@ -45,7 +45,6 @@ def join_handler(args, sock):
                 name=name,
                 address=(req.device_address.ip, req.device_address.port),
                 state_json=json.loads(req.device_info.state),
-                metadata_json=json.loads(req.device_info.metadata),
             )
         print(f'Ingresso bem-sucedido: {name}')
     finally:

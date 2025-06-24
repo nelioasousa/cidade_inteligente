@@ -30,11 +30,10 @@ class Database:
             else:
                 self.db = {}
     
-    def register_decive(self, name, address, state_json, metadata_json):
+    def register_decive(self, name, address, state_json):
         device = self.db.setdefault(name, {'name': name})
         device['address'] = address
         device['state'] = state_json
-        device['metadata'] = metadata_json
         device['last_seen'] = time.monotonic()
         device['online'] = True
         device.setdefault('data', [])

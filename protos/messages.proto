@@ -9,7 +9,6 @@ message Address {
 message DeviceInfo {
   string name = 1;
   string state = 2;
-  string metadata = 3;
 }
 
 message JoinRequest {
@@ -33,8 +32,6 @@ enum RequestType {
   ACTION = 1;
   GET_STATE = 2;
   SET_STATE = 3;
-  GET_METADATA = 4;
-  SET_METADATA = 5;
 }
 
 message DeviceRequest {
