@@ -71,8 +71,8 @@ class JoinReply(_message.Message):
     REPORT_ADDRESS_FIELD_NUMBER: _ClassVar[int]
     REPORT_INTERVAL_FIELD_NUMBER: _ClassVar[int]
     report_address: Address
-    report_interval: int
-    def __init__(self, report_address: _Optional[_Union[Address, _Mapping]] = ..., report_interval: _Optional[int] = ...) -> None: ...
+    report_interval: float
+    def __init__(self, report_address: _Optional[_Union[Address, _Mapping]] = ..., report_interval: _Optional[float] = ...) -> None: ...
 
 class SensorReading(_message.Message):
     __slots__ = ("sensor_name", "reading_value", "timestamp")
