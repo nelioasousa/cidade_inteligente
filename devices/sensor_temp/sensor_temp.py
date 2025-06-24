@@ -159,10 +159,12 @@ def set_state(args, new_state_string):
     if 'Actions' in new_state:
         status = ReplyStatus.DENIED
         body = '"Actions" é readonly'
-    if not isinstance(new_state.get('ReportInterval'), (NoneType, Real)):
-        status= ReplyStatus.BAD_REQUEST
-        body = '"ReportInterval" precisa ser `None` ou numérico'
-        return status, body
+    if 'ReportInterval' in new_state:
+        report_interval = new_state['ReportInterval']
+        if not isinstance(report_interval, Real) or report_interval <= 0.0:
+            status = ReplyStatus.BAD_REQUEST
+            body = '"ReportInterval" precisa um número real positivo'
+            return status, body
     if 'UnitName' in new_state or 'UnitSymbol' in new_state:
         status = ReplyStatus.DENIED
         body = '"UnitName" e "UnitSymbol" são readonly.'
