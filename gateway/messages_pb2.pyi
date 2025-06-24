@@ -12,8 +12,6 @@ class RequestType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ACTION: _ClassVar[RequestType]
     GET_STATE: _ClassVar[RequestType]
     SET_STATE: _ClassVar[RequestType]
-    GET_METADATA: _ClassVar[RequestType]
-    SET_METADATA: _ClassVar[RequestType]
 
 class ReplyStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -29,8 +27,6 @@ RT_UNSPECIFIED: RequestType
 ACTION: RequestType
 GET_STATE: RequestType
 SET_STATE: RequestType
-GET_METADATA: RequestType
-SET_METADATA: RequestType
 RS_UNSPECIFIED: ReplyStatus
 OK: ReplyStatus
 BAD_REQUEST: ReplyStatus
@@ -49,14 +45,12 @@ class Address(_message.Message):
     def __init__(self, ip: _Optional[str] = ..., port: _Optional[int] = ...) -> None: ...
 
 class DeviceInfo(_message.Message):
-    __slots__ = ("name", "state", "metadata")
+    __slots__ = ("name", "state")
     NAME_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
-    METADATA_FIELD_NUMBER: _ClassVar[int]
     name: str
     state: str
-    metadata: str
-    def __init__(self, name: _Optional[str] = ..., state: _Optional[str] = ..., metadata: _Optional[str] = ...) -> None: ...
+    def __init__(self, name: _Optional[str] = ..., state: _Optional[str] = ...) -> None: ...
 
 class JoinRequest(_message.Message):
     __slots__ = ("device_info", "device_address")
