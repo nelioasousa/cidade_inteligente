@@ -96,7 +96,7 @@ def try_to_connect(args, addrs):
     args.report_interval = join_reply.report_interval
     logger.info(
         'Conexão bem-sucedida com o Gateway em (%s, %s)',
-        addrs[0], join_reply.report_port, join_reply.report_interval
+        addrs[0], join_reply.report_port
     )
     return True
 
