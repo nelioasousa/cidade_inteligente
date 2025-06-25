@@ -6,7 +6,7 @@ from db import Database
 from concurrent.futures import ThreadPoolExecutor
 from google.protobuf import message
 from messages_pb2 import Address, SensorReading
-from messages_pb2 import JoinRequest, JoinReply
+from messages_pb2 import DeviceType, JoinRequest, JoinReply
 from messages_pb2 import DeviceRequest, DeviceReply, RequestType
 
 
@@ -26,26 +26,28 @@ def join_handler(args, sock):
         sock.settimeout(args.base_timeout)
         req = JoinRequest()
         req.ParseFromString(sock.recv(1024))
-        name = req.device_info.name
-        if name.startswith('Sensor'):
+        if req.device_info.type is DeviceType.SENSOR:
             report_interval = args.sensors_report_interval
             report_port = args.sensors_port
-        else:
+            with args.db_lock:
+                args.db.register_sensor(
+                    name=req.device_info.name,
+                    address=(req.device_address.ip, req.device_address.port),
+                    state=json.loads(req.device_info.state),
+                )
+        elif req.device_info.type is DeviceType.ACTUATOR:
             report_interval = args.actuators_report_interval
             report_port = args.actuators_port
+            # with args.db_lock:
+            #     args.db.register_actuator(...)
+        else:
+            raise RuntimeError('Invalid device type')
         report_address = Address(ip=args.host_ip, port=report_port)
-        sock.send(
-            JoinReply(
-                report_address=report_address, report_interval=report_interval
-            ).SerializeToString()
+        reply = JoinReply(
+            report_address=report_address, report_interval=report_interval
         )
-        with args.db_lock:
-            args.db.register_decive(
-                name=name,
-                address=(req.device_address.ip, req.device_address.port),
-                state_json=json.loads(req.device_info.state),
-            )
-        print(f'Ingresso bem-sucedido: {name}')
+        sock.send(reply.SerializeToString())
+        print(f'Ingresso bem-sucedido: {req.device_info.name}')
     finally:
         sock.shutdown(socket.SHUT_RDWR)
         sock.close()
@@ -79,18 +81,19 @@ def sensors_listener(args):
             except (TimeoutError, message.DecodeError):
                 continue
             name = reading.sensor_name
-            if not args.db.is_device_registered(name):
+            if not args.db.is_sensor_registered(name):
                 continue
             if name.startswith('Sensor-Temp'):
-                print('Leitura de temperatura recebida')
+                num_readings = args.db.count_sensor_readings(name) + 1
+                print(f'Leitura de temperatura recebida ({num_readings})')
                 reading_value = float(reading.reading_value)
                 data_item = (reading.timestamp, reading_value)
             with args.db_lock:
-                args.db.insert_data_item(name, data_item)
+                args.db.add_sensor_data(name, data_item)
 
 
 def simulate_requests(args):
-    device = args.db.get_device('Sensor-Temp-01')
+    device = args.db.get_sensor('Sensor-Temp-01')
     if device is None:
         return
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -131,7 +134,7 @@ def _run(args):
         multicaster.start()
         while True:
             time.sleep(10.0)
-            if args.db.has_data():
+            if args.db.sensors_count():
                 simulate_requests(args)
     except BaseException as e:
         args.stop_flag.set()

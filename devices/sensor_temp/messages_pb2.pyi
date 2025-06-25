@@ -6,6 +6,12 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class DeviceType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    DT_UNSPECIFIED: _ClassVar[DeviceType]
+    SENSOR: _ClassVar[DeviceType]
+    ACTUATOR: _ClassVar[DeviceType]
+
 class RequestType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     RT_UNSPECIFIED: _ClassVar[RequestType]
@@ -17,22 +23,25 @@ class ReplyStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     RS_UNSPECIFIED: _ClassVar[ReplyStatus]
     OK: _ClassVar[ReplyStatus]
-    BAD_REQUEST: _ClassVar[ReplyStatus]
-    FAIL: _ClassVar[ReplyStatus]
-    DENIED: _ClassVar[ReplyStatus]
     TIMEOUT: _ClassVar[ReplyStatus]
+    DENIED: _ClassVar[ReplyStatus]
+    FAIL: _ClassVar[ReplyStatus]
+    BAD_REQUEST: _ClassVar[ReplyStatus]
     UNKNOWN_TYPE: _ClassVar[ReplyStatus]
     UNKNOWN_ACTION: _ClassVar[ReplyStatus]
+DT_UNSPECIFIED: DeviceType
+SENSOR: DeviceType
+ACTUATOR: DeviceType
 RT_UNSPECIFIED: RequestType
 ACTION: RequestType
 GET_STATE: RequestType
 SET_STATE: RequestType
 RS_UNSPECIFIED: ReplyStatus
 OK: ReplyStatus
-BAD_REQUEST: ReplyStatus
-FAIL: ReplyStatus
-DENIED: ReplyStatus
 TIMEOUT: ReplyStatus
+DENIED: ReplyStatus
+FAIL: ReplyStatus
+BAD_REQUEST: ReplyStatus
 UNKNOWN_TYPE: ReplyStatus
 UNKNOWN_ACTION: ReplyStatus
 
@@ -45,12 +54,14 @@ class Address(_message.Message):
     def __init__(self, ip: _Optional[str] = ..., port: _Optional[int] = ...) -> None: ...
 
 class DeviceInfo(_message.Message):
-    __slots__ = ("name", "state")
+    __slots__ = ("type", "name", "state")
+    TYPE_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
+    type: DeviceType
     name: str
     state: str
-    def __init__(self, name: _Optional[str] = ..., state: _Optional[str] = ...) -> None: ...
+    def __init__(self, type: _Optional[_Union[DeviceType, str]] = ..., name: _Optional[str] = ..., state: _Optional[str] = ...) -> None: ...
 
 class JoinRequest(_message.Message):
     __slots__ = ("device_info", "device_address")

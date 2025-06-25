@@ -8,7 +8,7 @@ from types import NoneType
 from numbers import Real
 from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import Address, SensorReading
-from messages_pb2 import DeviceInfo, JoinRequest, JoinReply
+from messages_pb2 import DeviceType, DeviceInfo, JoinRequest, JoinReply
 from messages_pb2 import DeviceRequest, DeviceReply, RequestType, ReplyStatus
 from google.protobuf import message
 
@@ -63,6 +63,7 @@ def try_to_connect(args, addrs):
         try:
             sock.connect(addrs)
             device_info = DeviceInfo(
+                type=DeviceType.SENSOR,
                 name=args.name,
                 state=json.dumps(args.state),
             )

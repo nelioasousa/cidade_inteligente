@@ -1,58 +1,58 @@
 import os
 import time
-import json
+import pickle
+from sortedcontainers import SortedList
+
+
+def sensors_key(data_item):
+    return data_item[0]
 
 
 class Database:
 
-    def __init__(self, clean=False, db_file='db.json'):
+    def __init__(self, db_file='db.pickle', clear=False):
         self.db_file = db_file
-        if clean:
-            self.db = {}
+        if clear and os.path.isfile(self.db_file):
+            os.remove(self.db_file)
+        if os.path.isfile(self.db_file):
+            with open(self.db_file, mode='br') as db:
+                self.db = pickle.load(db)
         else:
-            if os.path.isfile(db_file):
-                with open(db_file, mode='r') as f:
-                    self.db = json.load(f)
-                for device in self.db:
-                    self.db[device]['address'] = tuple(self.db[device]['address'])
-            else:
-                self.db = {}
-    
-    def register_decive(self, name, address, state_json):
-        device = self.db.setdefault(name, {'name': name})
+            self.db = ({}, {})
+
+    def register_sensor(self, name, address, state):
+        device = self.db[0].setdefault(name, {'name': name})
         device['address'] = address
-        device['state'] = state_json
+        device['state'] = state
         device['last_seen'] = time.monotonic()
-        device.setdefault('data', [])
-    
-    def unregister_device(self, name):
-        return self.db.pop(name, {})
+        device.setdefault('data', SortedList(key=sensors_key))
     
     def persist(self):
-        with open(self.db_file, mode='w') as db_file:
-            json.dump(self.db, db_file)
+        with open(self.db_file, mode='bw') as db:
+            pickle.dump(self.db, db)
     
-    def get_device(self, name):
+    def get_sensor(self, name):
         try:
-            return self.db[name]
+            return self.db[0][name]
         except KeyError:
             return None
     
-    def get_device_data(self, name):
+    def get_sensor_data(self, name):
         try:
-            return self.db[name]['data']
+            return self.db[0][name]['data']
         except KeyError:
             return None
     
-    def insert_data_item(self, name, data_item, sork_key=None):
-        device = self.db[name]
-        device['data'].append(data_item)
-        device['last_seen'] = time.monotonic()
-        if sork_key is not None:
-            device['data'].sort(key=sork_key)
+    def add_sensor_data(self, name, data_item):
+        sensor = self.db[0][name]
+        sensor['data'].add(data_item)
+        sensor['last_seen'] = time.monotonic()
     
-    def has_data(self):
-        return bool(self.db)
+    def count_sensor_readings(self, name):
+        return len(self.db[0][name]['data'])
+
+    def sensors_count(self):
+        return len(self.db[0])
     
-    def is_device_registered(self, name):
-        return name in self.db
+    def is_sensor_registered(self, name):
+        return name in self.db[0]

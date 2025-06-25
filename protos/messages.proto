@@ -6,9 +6,16 @@ message Address {
   uint32 port = 2;
 }
 
+enum DeviceType {
+  DT_UNSPECIFIED = 0;
+  SENSOR = 1;
+  ACTUATOR = 2;
+}
+
 message DeviceInfo {
-  string name = 1;
-  string state = 2;
+  DeviceType type = 1;
+  string name = 2;
+  string state = 3;
 }
 
 message JoinRequest {
