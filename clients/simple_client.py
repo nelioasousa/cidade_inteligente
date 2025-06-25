@@ -3,6 +3,7 @@ import time
 import socket
 import threading
 import logging
+from google.protobuf import message
 from messages_pb2 import SensorsReport
 
 
@@ -15,20 +16,25 @@ def connect_to_gateway(args):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(args.base_timeout)
         sock.connect((args.gateway_ip, args.gateway_port))
+        logger.info('Conexão bem-sucedida')
         while not args.stop_flag.is_set():
             try:
                 report = SensorsReport()
                 report.ParseFromString(sock.recv(1024))
                 if args.verbose:
                     logger.info(
-                        'Relatório de %d dispositivos recebido',
+                        'Relatório de %d dispositivo(s) recebido',
                         len(report.readings)
                     )
-            except Exception as e:
+            except TimeoutError:
+                logger.error('Timeout na comunicação com o Gateway')
+                continue
+            except message.DecodeError as e:
                 logger.error(
-                    'Erro no recebimento do relatório do Gateway: (%s) %s',
+                    'Falha durante a desserialização da mensagem: (%s) %s',
                     type(e).__name__, e
                 )
+                continue
             time.sleep(2.0)
 
 
