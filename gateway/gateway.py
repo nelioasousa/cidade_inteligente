@@ -153,14 +153,7 @@ def send_report(args, sock, addrs):
         logger.info('Número de sensores reportados: %d', len(sensors_summary))
     report_msg = SensorsReport(readings=sensors_summary).SerializeToString()
     report_msg = pack('!I', len(report_msg)) + report_msg
-    try:
-        sock.sendall(report_msg)
-    except Exception as e:
-        logger.error(
-            'Erro ao enviar relatório para cliente em %s: (%s) %s',
-            addrs, type(e).__name__, e
-        )
-        return
+    sock.sendall(report_msg)
 
 
 def client_handler(args, sock, addrs):
