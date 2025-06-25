@@ -106,7 +106,7 @@ def send_report(args, sock):
             reading_value=str(report_item['reading_value']),
             timestamp=report_item['timestamp'].isoformat(),
             metadata=json.dumps(report_item['metadata']),
-            is_online=(not_seen_since <= args.sensors_report_interval),
+            is_online=(not_seen_since <= 2 * args.sensors_report_interval),
         )
     sensors_report = SensorsReport(readings=sensors_readings)
     try:
