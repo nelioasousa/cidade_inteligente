@@ -63,7 +63,7 @@ def try_to_connect(args, addrs):
                 name=args.name,
                 metadata=json.dumps(args.metadata),
             )
-            device_address = Address(ip=args.host_ip, port=args.port)
+            device_address = Address(ip=args.host_ip, port=0)
             join_request = JoinRequest(
                 device_info=device_info,
                 device_address=device_address,
@@ -135,11 +135,6 @@ def main():
     parser.add_argument(
         '--name', type=str, default='01',
         help='Nome que unicamente identifica o sensor de temperatura.'
-    )
-
-    parser.add_argument(
-        '--port', type=int, default=5000,
-        help='Porta em que o Gateway deve se comunicar com o sensor.'
     )
 
     parser.add_argument(
