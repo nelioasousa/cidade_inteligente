@@ -113,7 +113,7 @@ def sensors_listener(args):
                 reading.ParseFromString(msg)
             except (TimeoutError, message.DecodeError):
                 continue
-            name = reading.sensor_name
+            name = reading.device_name
             if name.startswith('Temperature'):
                 value = float(reading.reading_value)
                 timestamp = datetime.fromisoformat(reading.timestamp)
@@ -143,7 +143,7 @@ def send_report(args, sock, addrs):
     for i, sensor_summary in enumerate(sensors_summary):
         not_seen_since = (time.monotonic() - sensor_summary['last_seen'])
         sensors_summary[i] = SensorReading(
-            sensor_name=sensor_summary['sensor_name'],
+            device_name=sensor_summary['device_name'],
             reading_value=str(sensor_summary['reading_value']),
             timestamp=sensor_summary['timestamp'].isoformat(),
             metadata=json.dumps(sensor_summary['metadata']),

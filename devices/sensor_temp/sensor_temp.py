@@ -127,7 +127,7 @@ def transmit_readings(args):
                 time.sleep(5.0)
             else:
                 reading = SensorReading(
-                    sensor_name=args.name,
+                    device_name=args.name,
                     reading_value=str(get_reading(args)),
                     timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
                     metadata=json.dumps(args.metadata),

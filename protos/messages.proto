@@ -30,7 +30,7 @@ message JoinReply {
 }
 
 message SensorReading {
-  string sensor_name = 1;
+  string device_name = 1;
   string reading_value = 2;
   string timestamp = 3;
   string metadata = 4;
@@ -39,4 +39,16 @@ message SensorReading {
 
 message SensorsReport {
   repeated SensorReading readings = 1;
+}
+
+message ActuatorUpdate {
+  string device_name;
+  string action_value;
+  string timestamp;
+  string state;
+  bool is_online;
+}
+
+message ActuatorsReport {
+  repeated ActuatorUpdate updates = 1;
 }

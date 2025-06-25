@@ -67,7 +67,7 @@ class Database:
             except IndexError:
                 continue
             summary.append({
-                'sensor_name': sensor,
+                'device_name': sensor,
                 'reading_value': reading_value,
                 'timestamp': timestamp,
                 'metadata': sensor_data['metadata'],
