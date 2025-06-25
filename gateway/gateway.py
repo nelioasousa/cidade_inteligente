@@ -57,9 +57,8 @@ def join_handler(args, sock, addrs):
             #     args.db.register_actuator(...)
         else:
             raise RuntimeError('Invalid device type')
-        report_address = Address(ip=args.host_ip, port=report_port)
         reply = JoinReply(
-            report_address=report_address,
+            report_port=report_port,
             report_interval=report_interval,
         )
         sock.send(reply.SerializeToString())

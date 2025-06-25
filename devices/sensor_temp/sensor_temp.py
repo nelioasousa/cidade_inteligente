@@ -91,20 +91,12 @@ def try_to_connect(args, addrs):
                 addrs, type(e).__name__, e
             )
             return False
-    report_addrs = join_reply.report_address
-    if report_addrs.ip != addrs[0]:
-        logger.warning(
-            'Redirecionamento de conexão (de %s para %s) foi bloqueado',
-            addrs[0], report_addrs.ip
-        )
-        return False
-    args.gateway_ip = report_addrs.ip
-    args.transmission_port = report_addrs.port
+    args.gateway_ip = addrs[0]
+    args.transmission_port = join_reply.report_port
     args.report_interval = join_reply.report_interval
     logger.info(
-        'Conexão com Gateway em (%s, %s) bem-sucedida. '
-        'Intervalo de resposta de %.2f secs',
-        report_addrs.ip, report_addrs.port, join_reply.report_interval
+        'Conexão bem-sucedida com o Gateway em (%s, %s)',
+        addrs[0], join_reply.report_port, join_reply.report_interval
     )
     return True
 
