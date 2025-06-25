@@ -152,8 +152,6 @@ def send_report(args, sock, addrs):
     if args.verbose:
         logger.info('Número de sensores reportados: %d', len(sensors_summary))
     report_msg = SensorsReport(readings=sensors_summary).SerializeToString()
-    if len(report_msg) >= 2 ** 32:
-        raise BufferError('Message is too big')
     report_msg = pack('!I', len(report_msg)) + report_msg
     try:
         sock.sendall(report_msg)
@@ -311,7 +309,7 @@ def main():
     if args.level == 'DEBUG':
         args.verbose = True
     args.base_timeout = 2.5
-    args.client_timeout = 1.0
+    args.client_timeout = 5.0
     args.host_ip = socket.gethostbyname(socket.gethostname())
     args.db = Database()
     args.stop_flag = threading.Event()

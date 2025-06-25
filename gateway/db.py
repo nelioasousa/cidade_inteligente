@@ -4,10 +4,6 @@ import pickle
 from sortedcontainers import SortedList
 
 
-def sensors_sort_key(data_item):
-    return data_item[0]
-
-
 class Database:
 
     def __init__(self, db_file='db.pickle', clear=False):
@@ -25,7 +21,7 @@ class Database:
         device['address'] = address
         device['metadata'] = metadata
         device['last_seen'] = time.monotonic()
-        device.setdefault('data', SortedList(key=sensors_sort_key))
+        device.setdefault('data', SortedList())
     
     def persist(self):
         with open(self.db_file, mode='bw') as db:
