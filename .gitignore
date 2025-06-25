@@ -6,4 +6,4 @@ venv/
 
 # Outros
 /test.py
-db.json
+db.pickle
