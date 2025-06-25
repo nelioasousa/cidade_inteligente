@@ -30,7 +30,7 @@ def join_handler(args, sock):
         if req.device_info.type is DeviceType.SENSOR:
             report_interval = args.sensors_report_interval
             report_port = args.sensors_port
-            with args.db_lock:
+            with args.db_sensors_lock:
                 args.db.register_sensor(
                     name=req.device_info.name,
                     address=(req.device_address.ip, req.device_address.port),
@@ -39,13 +39,14 @@ def join_handler(args, sock):
         elif req.device_info.type is DeviceType.ACTUATOR:
             report_interval = args.actuators_report_interval
             report_port = args.actuators_port
-            # with args.db_lock:
+            # with args.db_actuators_lock:
             #     args.db.register_actuator(...)
         else:
             raise RuntimeError('Invalid device type')
         report_address = Address(ip=args.host_ip, port=report_port)
         reply = JoinReply(
-            report_address=report_address, report_interval=report_interval
+            report_address=report_address,
+            report_interval=report_interval,
         )
         sock.send(reply.SerializeToString())
         print(f'Ingresso bem-sucedido: {req.device_info.name}')
@@ -82,33 +83,30 @@ def sensors_listener(args):
             except (TimeoutError, message.DecodeError):
                 continue
             name = reading.sensor_name
-            if not args.db.is_sensor_registered(name):
-                continue
             if name.startswith('Temperature'):
-                num_readings = args.db.count_sensor_readings(name) + 1
-                print(f'Leitura de temperatura recebida ({num_readings})')
+                print('Leitura de temperatura recebida')
                 value = float(reading.reading_value)
                 timestamp = datetime.fromisoformat(reading.timestamp)
+                metadata = json.loads(reading.metadata)
             else:
                 return
-            with args.db_lock:
-                args.db.add_sensor_reading(
-                    name, value, timestamp, reading.metadata
-                )
+            with args.db_sensors_lock:
+                args.db.add_sensor_reading(name, value, timestamp, metadata)
 
 
 def send_report(args, sock):
-    sensors_readings = args.db.get_sensors_readings()
-    for i, report_item in enumerate(sensors_readings):
-        not_seen_since = (time.monotonic() - report_item['last_seen'])
-        sensors_readings[i] = SensorReading(
-            sensor_name=report_item['sensor_name'],
-            reading_value=str(report_item['reading_value']),
-            timestamp=report_item['timestamp'].isoformat(),
-            metadata=json.dumps(report_item['metadata']),
+    with args.db_sensors_lock:
+        sensors_summary = args.db.get_sensors_summary()
+    for i, sensor_summary in enumerate(sensors_summary):
+        not_seen_since = (time.monotonic() - sensor_summary['last_seen'])
+        sensors_summary[i] = SensorReading(
+            sensor_name=sensor_summary['sensor_name'],
+            reading_value=str(sensor_summary['reading_value']),
+            timestamp=sensor_summary['timestamp'].isoformat(),
+            metadata=json.dumps(sensor_summary['metadata']),
             is_online=(not_seen_since <= 2 * args.sensors_report_interval),
         )
-    sensors_report = SensorsReport(readings=sensors_readings)
+    sensors_report = SensorsReport(readings=sensors_summary)
     try:
         sock.send(sensors_report.SerializeToString())
     except Exception:
@@ -118,7 +116,7 @@ def send_report(args, sock):
 
 def client_handler(args, sock):
     try:
-        sock.settimeout(args.base_timeout)
+        sock.settimeout(args.client_timeout)
         while not args.stop_flag.is_set():
             print(f'Enviando relatório para cliente em {sock.getpeername()}')
             send_report(args, sock)
@@ -156,18 +154,13 @@ def _run(args):
         slistener = threading.Thread(
             target=sensors_listener, args=(args,)
         )
-        clistener = threading.Thread(
-            target=clients_listener, args=(args,)
-        )
         multicaster = threading.Thread(
             target=multicast_location, args=(args,)
         )
         jlistener.start()
         slistener.start()
-        clistener.start()
         multicaster.start()
-        while True:
-            time.sleep(10.0)
+        clients_listener(args)
     except BaseException as e:
         args.stop_flag.set()
         if isinstance(e, KeyboardInterrupt):
@@ -178,7 +171,6 @@ def _run(args):
         multicaster.join()
         slistener.join()
         jlistener.join()
-        clistener.join()
         args.db.persist()
 
 
@@ -234,10 +226,11 @@ def main():
 
     args = parser.parse_args()
     args.base_timeout = 2.5
+    args.client_timeout = 1.0
     args.host_ip = socket.gethostbyname(socket.gethostname())
     args.db = Database()
     args.stop_flag = threading.Event()
-    args.db_lock = threading.Lock()
+    args.db_sensors_lock = threading.Lock()
 
     return _run(args)
 

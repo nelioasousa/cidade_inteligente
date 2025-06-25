@@ -1,11 +1,10 @@
 import os
 import time
 import pickle
-import json
 from sortedcontainers import SortedList
 
 
-def sensors_key(data_item):
+def sensors_sort_key(data_item):
     return data_item[0]
 
 
@@ -26,7 +25,7 @@ class Database:
         device['address'] = address
         device['metadata'] = metadata
         device['last_seen'] = time.monotonic()
-        device.setdefault('data', SortedList(key=sensors_key))
+        device.setdefault('data', SortedList(key=sensors_sort_key))
     
     def persist(self):
         with open(self.db_file, mode='bw') as db:
@@ -44,12 +43,16 @@ class Database:
         except KeyError:
             return None
     
-    def add_sensor_reading(self, name, value, timestamp, metadata_string):
-        sensor = self.db[0][name]
+    def add_sensor_reading(self, name, value, timestamp, metadata):
+        try:
+            sensor = self.db[0][name]
+        except KeyError:
+            return False
         sensor['data'].add((timestamp, value))
         if sensor['data'][-1][0] == timestamp:
-            sensor['metadata'] = json.loads(metadata_string)
+            sensor['metadata'] = metadata
         sensor['last_seen'] = time.monotonic()
+        return True
     
     def count_sensor_readings(self, name):
         return len(self.db[0][name]['data'])
@@ -60,14 +63,14 @@ class Database:
     def is_sensor_registered(self, name):
         return name in self.db[0]
 
-    def get_sensors_readings(self):
-        result = []
+    def get_sensors_summary(self):
+        summary = []
         for sensor, data in self.db[0].items():
-            result.append({
+            summary.append({
                 'sensor_name': sensor,
                 'reading_value': data['data'][-1][1],
                 'timestamp': data['data'][-1][0],
                 'metadata': data['metadata'],
                 'last_seen': data['last_seen'],
             })
-        return result
+        return summary
