@@ -1,7 +1,9 @@
+import sys
 import socket
 import threading
 import time
 import json
+import logging
 from datetime import datetime
 from db import Database
 from concurrent.futures import ThreadPoolExecutor
@@ -12,17 +14,28 @@ from messages_pb2 import SensorsReport
 
 
 def multicast_location(args):
+    logger = logging.getLogger('MULTICASTER')
+    logger.info(
+        'Multicasting endereço de registro de dispositivos: (%s, %s)',
+        args.host_ip, args.registration_port
+    )
     addrs = Address(ip=args.host_ip, port=args.registration_port)
     addrs = addrs.SerializeToString()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
-        while not args.stop_flag.is_set():
-            sock.sendto(addrs, (args.multicast_ip, args.multicast_port))
-            time.sleep(args.multicast_interval)
+        try:
+            while not args.stop_flag.is_set():
+                sock.sendto(addrs, (args.multicast_ip, args.multicast_port))
+                time.sleep(args.multicast_interval)
+        except Exception as e:
+            logger.error('Erro durante multicast: (%s) %s', type(e).__name__, e)
 
 
-def join_handler(args, sock):
-    print('Tratando pedido de ingresso')
+def join_handler(args, sock, addrs):
+    logger = logging.getLogger(f'JOIN_HANDLER_{threading.get_ident()}')
+    logger.info(
+        'Processando requisição de ingresso de %s', addrs
+    )
     try:
         sock.settimeout(args.base_timeout)
         req = JoinRequest()
@@ -49,31 +62,48 @@ def join_handler(args, sock):
             report_interval=report_interval,
         )
         sock.send(reply.SerializeToString())
-        print(f'Ingresso bem-sucedido: {req.device_info.name}')
+        logger.info(
+            'Ingresso bem-sucedido do dispositivo %s em %s',
+            req.device_info.name, addrs
+        )
+    except Exception as e:
+        logger.error(
+            'Erro no processamento da requisição de %s: (%s) %s',
+            addrs, type(e).__name__, e
+        )
     finally:
         sock.shutdown(socket.SHUT_RDWR)
         sock.close()
 
 
-def join_listener(args):
+def registration_listener(args):
+    logger = logging.getLogger('REGISTRATION_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(('', args.registration_port))
         sock.listen()
-        print('Ouvindo requisições de ingresso')
+        logger.info(
+            'Escutando requisições de registro em (%s, %s)',
+            args.host_ip, args.registration_port
+        )
         sock.settimeout(args.base_timeout)
         with ThreadPoolExecutor(max_workers=10) as executor:
             while not args.stop_flag.is_set():
                 try:
-                    conn, _ = sock.accept()
+                    conn, addrs = sock.accept()
                 except TimeoutError:
                     continue
-                executor.submit(join_handler, args, conn)
+                executor.submit(join_handler, args, conn, addrs)
 
 
 def sensors_listener(args):
+    logger = logging.getLogger('SENSORS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.bind(('', args.sensors_port))
+        logger.info(
+            'Escutando por dados sensoriais em (%s, %s)',
+            args.host_ip, args.sensors_port
+        )
         sock.settimeout(args.base_timeout)
         while not args.stop_flag.is_set():
             try:
@@ -84,17 +114,29 @@ def sensors_listener(args):
                 continue
             name = reading.sensor_name
             if name.startswith('Temperature'):
-                print('Leitura de temperatura recebida')
                 value = float(reading.reading_value)
                 timestamp = datetime.fromisoformat(reading.timestamp)
                 metadata = json.loads(reading.metadata)
+                if args.verbose:
+                    logger.info(
+                        'Leitura de temperatura recebida: '
+                        '(%s, %s %s, %s)',
+                        name, value, metadata['UnitSymbol'], reading.timestamp
+                    )
             else:
                 return
             with args.db_sensors_lock:
-                args.db.add_sensor_reading(name, value, timestamp, metadata)
+                result = args.db.add_sensor_reading(name, value, timestamp, metadata)
+                if args.verbose and not result:
+                    logger.info(
+                        'Recebendo leituras de um sensor desconhecido: %s', name
+                    )
 
 
-def send_report(args, sock):
+def send_report(args, sock, addrs):
+    logger = logging.getLogger('SEND_REPORT')
+    if args.verbose:
+        logger.info('Enviando relatório para cliente em %s', addrs)
     with args.db_sensors_lock:
         sensors_summary = args.db.get_sensors_summary()
     for i, sensor_summary in enumerate(sensors_summary):
@@ -106,51 +148,75 @@ def send_report(args, sock):
             metadata=json.dumps(sensor_summary['metadata']),
             is_online=(not_seen_since <= 2 * args.sensors_report_interval),
         )
-    print(f'Número de sensores reportados: {len(sensors_summary)}')
+    if args.verbose:
+        logger.info(f'Número de sensores reportados: {len(sensors_summary)}')
     sensors_report = SensorsReport(readings=sensors_summary)
     try:
         sock.send(sensors_report.SerializeToString())
-    except Exception:
-        print(f'Erro ao enviar relatório para {sock.getpeername()}')
+    except Exception as e:
+        logger.error(
+            'Erro ao enviar relatório para cliente em %s: (%s) %s',
+            addrs, type(e).__name__, e
+        )
         return
 
 
-def client_handler(args, sock):
+def client_handler(args, sock, addrs):
+    logger = logging.getLogger(f'CLIENT_HANDLER_{threading.get_ident()}')
+    logger.info('Gerenciando conexão com o cliente em %s', addrs)
     try:
         sock.settimeout(args.client_timeout)
         while not args.stop_flag.is_set():
-            print(f'Enviando relatório para cliente em {sock.getpeername()}')
-            send_report(args, sock)
+            send_report(args, sock, addrs)
             try:
                 _ = sock.recv(1024)
             except TimeoutError:
                 continue
+    except Exception as e:
+        logger.error(
+            'Erro durante conexão com o cliente em %s: (%s) %s',
+            addrs, type(e).__name__, e
+        )
+        raise e
     finally:
         sock.shutdown(socket.SHUT_RDWR)
         sock.close()
 
 
 def clients_listener(args):
+    logger = logging.getLogger('CLIENTS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(('', args.clients_port))
         sock.listen()
-        print('Ouvindo requisições dos clientes')
+        logger.info(
+            'Escutando pedidos de conexão dos clientes em (%s, %s)',
+            args.host_ip, args.clients_port
+        )
         sock.settimeout(args.base_timeout)
         with ThreadPoolExecutor(max_workers=10) as executor:
             while not args.stop_flag.is_set():
                 try:
                     conn, addrs = sock.accept()
-                    print(f'Conectado com {addrs}')
                 except TimeoutError:
                     continue
-                executor.submit(client_handler, args, conn)
+                except Exception as e:
+                    logger.error(
+                        'Erro ao tentar conexão com um novo cliente: (%s) %s',
+                        type(e).__name__, e
+                    )
+                executor.submit(client_handler, args, conn, addrs)
 
 
 def _run(args):
+    logging.basicConfig(
+        level=args.level,
+        handlers=(logging.StreamHandler(sys.stdout),),
+        format='[%(levelname)s %(asctime)s] %(name)s\n  %(message)s',
+    )
     try:
         jlistener = threading.Thread(
-            target=join_listener, args=(args,)
+            target=registration_listener, args=(args,)
         )
         slistener = threading.Thread(
             target=sensors_listener, args=(args,)
@@ -165,7 +231,7 @@ def _run(args):
     except BaseException as e:
         args.stop_flag.set()
         if isinstance(e, KeyboardInterrupt):
-            print('\rDESLIGANDO...')
+            print('\nDESLIGANDO...')
         else:
             raise e
     finally:
@@ -177,7 +243,7 @@ def _run(args):
 
 def main():
     import argparse
-    
+
     parser = argparse.ArgumentParser(description='Gateway')
 
     parser.add_argument(
@@ -225,7 +291,21 @@ def main():
         help='Intervalo de envio de dados dos atuadores.'
     )
 
+    parser.add_argument(
+        '-v', '--verbose', action='store_true',
+        help='Torna o Gateway verboso ao logar informações.'
+    )
+
+    parser.add_argument(
+        '-l', '--level', type=str, default='INFO',
+        help='Nível do logging. Valores permitidos são "INFO", "WARN", "ERROR".'
+    )
+
     args = parser.parse_args()
+    lvl = args.level.strip().upper()
+    args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
+    if args.level == 'DEBUG':
+        args.verbose = True
     args.base_timeout = 2.5
     args.client_timeout = 1.0
     args.host_ip = socket.gethostbyname(socket.gethostname())

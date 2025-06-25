@@ -1,14 +1,17 @@
+import sys
 import json
 import socket
 import time
 import datetime
 import random
 import threading
+import logging
 from messages_pb2 import Address, SensorReading
 from messages_pb2 import DeviceType, DeviceInfo, JoinRequest, JoinReply
 
 
 def gateway_discoverer(args):
+    logger = logging.getLogger('GATEWAY_DISCOVERER')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(('', args.multicast_port))
@@ -17,6 +20,10 @@ def gateway_discoverer(args):
             socket.IP_ADD_MEMBERSHIP,
             socket.inet_aton(args.multicast_ip) + socket.inet_aton('0.0.0.0')
         )
+        logger.info(
+            'Procurando pelo Gateway no grupo multicast (%s, %s)',
+            args.multicast_ip, args.multicast_port
+        )
         sock.settimeout(args.multicast_timeout)
         fail_counter = 0
         while not args.stop_flag.is_set():
@@ -24,10 +31,16 @@ def gateway_discoverer(args):
                 msg = sock.recv(1024)
             except TimeoutError:
                 if args.gateway_ip is not None:
-                    print(f'Falha do Gateway em {args.gateway_ip}')
+                    logger.warning(
+                        'Falha de transmissão do Gateway em %s', args.gateway_ip
+                    )
                     fail_counter += 1
                     if fail_counter >= args.disconnect_after:
-                        print('Gateway offline. Desconectando sensor...')
+                        logger.warning(
+                            'Gateway offline: falhou %d transmissões em '
+                            'sequência. Desconectando sensor...',
+                            args.disconnect_after
+                        )
                         disconnect_device(args)
                 continue
             gateway_addrs = Address()
@@ -36,13 +49,13 @@ def gateway_discoverer(args):
                 if gateway_addrs.ip == args.gateway_ip:
                     continue
                 else:
-                    print('Gateway realocado. Desconectando...')
+                    logger.warning(
+                        'Gateway realocado de %s para %s. Desconectando sensor...',
+                        args.gateway_ip, gateway_addrs.ip,
+                    )
                     disconnect_device(args)
             if try_to_connect(args, (gateway_addrs.ip, gateway_addrs.port)):
                 fail_counter = 0
-                print(f'Conexão bem-sucedida com {gateway_addrs.ip}')
-            else:
-                print(f'Falha ao se conectar com {gateway_addrs.ip}')
 
 
 def disconnect_device(args):
@@ -53,7 +66,8 @@ def disconnect_device(args):
 
 
 def try_to_connect(args, addrs):
-    print('Tentando conectar com', addrs)
+    logger = logging.getLogger('TRY_CONNECTION')
+    logger.info('Tentando conexão com %s', addrs)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(args.base_timeout)
         try:
@@ -71,15 +85,27 @@ def try_to_connect(args, addrs):
             sock.send(join_request.SerializeToString())
             join_reply = JoinReply()
             join_reply.ParseFromString(sock.recv(1024))
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                'Erro durante tentativa de conexão com %s: (%s) %s',
+                addrs, type(e).__name__, e
+            )
             return False
     report_addrs = join_reply.report_address
     if report_addrs.ip != addrs[0]:
-        print('Não é permitido redirecionamento para outro servidor')
+        logger.warning(
+            'Redirecionamento de conexão (de %s para %s) foi bloqueado',
+            addrs[0], report_addrs.ip
+        )
         return False
     args.gateway_ip = report_addrs.ip
     args.transmission_port = report_addrs.port
     args.report_interval = join_reply.report_interval
+    logger.info(
+        'Conexão com Gateway em (%s, %s) bem-sucedida. '
+        'Intervalo de resposta de %.2f secs',
+        report_addrs.ip, report_addrs.port, join_reply.report_interval
+    )
     return True
 
 
@@ -91,11 +117,13 @@ def get_reading(args):
 
 
 def transmit_readings(args):
-    print('Começando a transmissão de leituras')
+    logger = logging.getLogger('READINGS_TRANSMITER')
+    logger.info('Começando a transmissão de leituras para o Gateway')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         while not args.stop_flag.is_set():
             if args.gateway_ip is None:
-                print('Transmissão parada. Sem conexão com o Gateway')
+                if args.verbose:
+                    logger.info('Transmissão interrompida. Sem conexão com o Gateway')
                 time.sleep(5.0)
             else:
                 reading = SensorReading(
@@ -108,11 +136,20 @@ def transmit_readings(args):
                     reading.SerializeToString(),
                     (args.gateway_ip, args.transmission_port),
                 )
-                print('Leitura de temperatura enviada')
+                if args.verbose:
+                    logger.info(
+                        'Leitura de temperatura enviada para (%s, %s)',
+                        args.gateway_ip, args.transmission_port
+                    )
                 time.sleep(args.report_interval)
 
 
 def _run(args):
+    logging.basicConfig(
+        level=args.level,
+        handlers=(logging.StreamHandler(sys.stdout),),
+        format='[%(levelname)s %(asctime)s] %(name)s\n  %(message)s',
+    )
     try:
         transmiter = threading.Thread(target=transmit_readings, args=(args,))
         transmiter.start()
@@ -120,7 +157,7 @@ def _run(args):
     except BaseException as e:
         args.stop_flag.set()
         if isinstance(e, KeyboardInterrupt):
-            print('\rDESLIGANDO...')
+            print('\nDESLIGANDO...')
         else:
             raise e
     finally:
@@ -167,7 +204,21 @@ def main():
         help='Número de falhas sequenciais necessárias para desconectar o Gateway.'
     )
 
+    parser.add_argument(
+        '-v', '--verbose', action='store_true',
+        help='Torna o Gateway verboso ao logar informações.'
+    )
+
+    parser.add_argument(
+        '-l', '--level', type=str, default='INFO',
+        help='Nível do logging. Valores permitidos são "DEBUG", "INFO", "WARN", "ERROR".'
+    )
+
     args = parser.parse_args()
+    lvl = args.level.strip().upper()
+    args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
+    if args.level == 'DEBUG':
+        args.verbose = True
     args.name = f'Temperature-{args.name}'
     args.base_timeout = 2.5
     args.multicast_timeout = 5.0
