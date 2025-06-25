@@ -106,6 +106,7 @@ def send_report(args, sock):
             metadata=json.dumps(sensor_summary['metadata']),
             is_online=(not_seen_since <= 2 * args.sensors_report_interval),
         )
+    print(f'Número de sensores reportados: {len(sensors_summary)}')
     sensors_report = SensorsReport(readings=sensors_summary)
     try:
         sock.send(sensors_report.SerializeToString())

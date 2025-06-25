@@ -12,7 +12,10 @@ def connect_to_gateway(args):
             try:
                 report = SensorsReport()
                 report.ParseFromString(sock.recv(1024))
-                print(report)
+                print('[!] Report recebido:')
+                for reading in report.readings:
+                    print(reading)
+                print('\n\n')
             except Exception:
                 import traceback
                 traceback.print_exc()
