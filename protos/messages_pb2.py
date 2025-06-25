@@ -24,31 +24,31 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0emessages.proto\"#\n\x07\x41\x64\x64ress\x12\n\n\x02ip\x18\x01 \x01(\t\x12\x0c\n\x04port\x18\x02 \x01(\r\"D\n\nDeviceInfo\x12\x19\n\x04type\x18\x01 \x01(\x0e\x32\x0b.DeviceType\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\r\n\x05state\x18\x03 \x01(\t\"Q\n\x0bJoinRequest\x12 \n\x0b\x64\x65vice_info\x18\x01 \x01(\x0b\x32\x0b.DeviceInfo\x12 \n\x0e\x64\x65vice_address\x18\x02 \x01(\x0b\x32\x08.Address\"F\n\tJoinReply\x12 \n\x0ereport_address\x18\x01 \x01(\x0b\x32\x08.Address\x12\x17\n\x0freport_interval\x18\x02 \x01(\x02\"N\n\rSensorReading\x12\x13\n\x0bsensor_name\x18\x01 \x01(\t\x12\x15\n\rreading_value\x18\x02 \x01(\t\x12\x11\n\ttimestamp\x18\x03 \x01(\t\"9\n\rDeviceRequest\x12\x1a\n\x04type\x18\x01 \x01(\x0e\x32\x0c.RequestType\x12\x0c\n\x04\x62ody\x18\x02 \x01(\t\"9\n\x0b\x44\x65viceReply\x12\x1c\n\x06status\x18\x01 \x01(\x0e\x32\x0c.ReplyStatus\x12\x0c\n\x04\x62ody\x18\x02 \x01(\t*:\n\nDeviceType\x12\x12\n\x0e\x44T_UNSPECIFIED\x10\x00\x12\n\n\x06SENSOR\x10\x01\x12\x0c\n\x08\x41\x43TUATOR\x10\x02*K\n\x0bRequestType\x12\x12\n\x0eRT_UNSPECIFIED\x10\x00\x12\n\n\x06\x41\x43TION\x10\x01\x12\r\n\tGET_STATE\x10\x02\x12\r\n\tSET_STATE\x10\x03*\x83\x01\n\x0bReplyStatus\x12\x12\n\x0eRS_UNSPECIFIED\x10\x00\x12\x06\n\x02OK\x10\x01\x12\x0b\n\x07TIMEOUT\x10\x02\x12\n\n\x06\x44\x45NIED\x10\x03\x12\x08\n\x04\x46\x41IL\x10\x04\x12\x0f\n\x0b\x42\x41\x44_REQUEST\x10\x05\x12\x10\n\x0cUNKNOWN_TYPE\x10\x06\x12\x12\n\x0eUNKNOWN_ACTION\x10\x07\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0emessages.proto\"#\n\x07\x41\x64\x64ress\x12\n\n\x02ip\x18\x01 \x01(\t\x12\x0c\n\x04port\x18\x02 \x01(\r\"V\n\nDeviceInfo\x12\x19\n\x04type\x18\x01 \x01(\x0e\x32\x0b.DeviceType\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\r\n\x05state\x18\x03 \x01(\t\x12\x10\n\x08metadata\x18\x04 \x01(\t\"Q\n\x0bJoinRequest\x12 \n\x0b\x64\x65vice_info\x18\x01 \x01(\x0b\x32\x0b.DeviceInfo\x12 \n\x0e\x64\x65vice_address\x18\x02 \x01(\x0b\x32\x08.Address\"F\n\tJoinReply\x12 \n\x0ereport_address\x18\x01 \x01(\x0b\x32\x08.Address\x12\x17\n\x0freport_interval\x18\x02 \x01(\x02\"`\n\rSensorReading\x12\x13\n\x0bsensor_name\x18\x01 \x01(\t\x12\x15\n\rreading_value\x18\x02 \x01(\t\x12\x11\n\ttimestamp\x18\x03 \x01(\t\x12\x10\n\x08metadata\x18\x04 \x01(\t\"9\n\rDeviceRequest\x12\x1a\n\x04type\x18\x01 \x01(\x0e\x32\x0c.RequestType\x12\x0c\n\x04\x62ody\x18\x02 \x01(\t\"9\n\x0b\x44\x65viceReply\x12\x1c\n\x06status\x18\x01 \x01(\x0e\x32\x0c.ReplyStatus\x12\x0c\n\x04\x62ody\x18\x02 \x01(\t*:\n\nDeviceType\x12\x12\n\x0e\x44T_UNSPECIFIED\x10\x00\x12\n\n\x06SENSOR\x10\x01\x12\x0c\n\x08\x41\x43TUATOR\x10\x02*K\n\x0bRequestType\x12\x12\n\x0eRT_UNSPECIFIED\x10\x00\x12\n\n\x06\x41\x43TION\x10\x01\x12\r\n\tGET_STATE\x10\x02\x12\r\n\tSET_STATE\x10\x03*\x83\x01\n\x0bReplyStatus\x12\x12\n\x0eRS_UNSPECIFIED\x10\x00\x12\x06\n\x02OK\x10\x01\x12\x0b\n\x07TIMEOUT\x10\x02\x12\n\n\x06\x44\x45NIED\x10\x03\x12\x08\n\x04\x46\x41IL\x10\x04\x12\x0f\n\x0b\x42\x41\x44_REQUEST\x10\x05\x12\x10\n\x0cUNKNOWN_TYPE\x10\x06\x12\x12\n\x0eUNKNOWN_ACTION\x10\x07\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'messages_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_DEVICETYPE']._serialized_start=478
-  _globals['_DEVICETYPE']._serialized_end=536
-  _globals['_REQUESTTYPE']._serialized_start=538
-  _globals['_REQUESTTYPE']._serialized_end=613
-  _globals['_REPLYSTATUS']._serialized_start=616
-  _globals['_REPLYSTATUS']._serialized_end=747
+  _globals['_DEVICETYPE']._serialized_start=514
+  _globals['_DEVICETYPE']._serialized_end=572
+  _globals['_REQUESTTYPE']._serialized_start=574
+  _globals['_REQUESTTYPE']._serialized_end=649
+  _globals['_REPLYSTATUS']._serialized_start=652
+  _globals['_REPLYSTATUS']._serialized_end=783
   _globals['_ADDRESS']._serialized_start=18
   _globals['_ADDRESS']._serialized_end=53
   _globals['_DEVICEINFO']._serialized_start=55
-  _globals['_DEVICEINFO']._serialized_end=123
-  _globals['_JOINREQUEST']._serialized_start=125
-  _globals['_JOINREQUEST']._serialized_end=206
-  _globals['_JOINREPLY']._serialized_start=208
-  _globals['_JOINREPLY']._serialized_end=278
-  _globals['_SENSORREADING']._serialized_start=280
-  _globals['_SENSORREADING']._serialized_end=358
-  _globals['_DEVICEREQUEST']._serialized_start=360
-  _globals['_DEVICEREQUEST']._serialized_end=417
-  _globals['_DEVICEREPLY']._serialized_start=419
-  _globals['_DEVICEREPLY']._serialized_end=476
+  _globals['_DEVICEINFO']._serialized_end=141
+  _globals['_JOINREQUEST']._serialized_start=143
+  _globals['_JOINREQUEST']._serialized_end=224
+  _globals['_JOINREPLY']._serialized_start=226
+  _globals['_JOINREPLY']._serialized_end=296
+  _globals['_SENSORREADING']._serialized_start=298
+  _globals['_SENSORREADING']._serialized_end=394
+  _globals['_DEVICEREQUEST']._serialized_start=396
+  _globals['_DEVICEREQUEST']._serialized_end=453
+  _globals['_DEVICEREPLY']._serialized_start=455
+  _globals['_DEVICEREPLY']._serialized_end=512
 # @@protoc_insertion_point(module_scope)

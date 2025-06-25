@@ -4,13 +4,8 @@ import time
 import datetime
 import random
 import threading
-from types import NoneType
-from numbers import Real
-from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import Address, SensorReading
 from messages_pb2 import DeviceType, DeviceInfo, JoinRequest, JoinReply
-from messages_pb2 import DeviceRequest, DeviceReply, RequestType, ReplyStatus
-from google.protobuf import message
 
 
 def gateway_discoverer(args):
@@ -53,6 +48,7 @@ def gateway_discoverer(args):
 def disconnect_device(args):
     args.gateway_ip = None
     args.transmission_port = None
+    args.report_interval = None
     return
 
 
@@ -65,7 +61,7 @@ def try_to_connect(args, addrs):
             device_info = DeviceInfo(
                 type=DeviceType.SENSOR,
                 name=args.name,
-                state=json.dumps(args.state),
+                metadata=json.dumps(args.metadata),
             )
             device_address = Address(ip=args.host_ip, port=args.port)
             join_request = JoinRequest(
@@ -83,7 +79,7 @@ def try_to_connect(args, addrs):
         return False
     args.gateway_ip = report_addrs.ip
     args.transmission_port = report_addrs.port
-    args.state['ReportInterval'] = join_reply.report_interval
+    args.report_interval = join_reply.report_interval
     return True
 
 
@@ -91,10 +87,6 @@ def get_reading(args):
     temp = args.temperature + random.random() - 0.5
     temp = min(max(temp, args.min_temperature), args.max_temperature)
     args.temperature = temp
-    if args.state['UnitName'] == 'Kelvin':
-        return temp + 273.15
-    if args.state['UnitName'] == 'Fahrenheit':
-        return 32.0 + (temp * 9 / 5)
     return temp
 
 
@@ -110,123 +102,19 @@ def transmit_readings(args):
                     sensor_name=args.name,
                     reading_value=f'{get_reading(args):.2f}',
                     timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
+                    metadata=json.dumps(args.metadata),
                 )
                 sock.sendto(
                     reading.SerializeToString(),
                     (args.gateway_ip, args.transmission_port),
                 )
                 print('Leitura de temperatura enviada')
-                time.sleep(args.state['ReportInterval'])
-
-
-def set_state(args, new_state_string):
-    try:
-        new_state = json.loads(new_state_string)
-    except json.JSONDecodeError:
-        status = ReplyStatus.BAD_REQUEST
-        body = 'Não foi possível decodificar o corpo da requisição'
-        return status, body
-    except UnicodeDecodeError:
-        status = ReplyStatus.BAD_REQUEST
-        body = 'Corpo da requisição precisar estar em UTF-8, 16 ou 32'
-        return status, body
-    if not isinstance(new_state, dict):
-        status = ReplyStatus.BAD_REQUEST
-        body = 'Corpo da requisição precisar ser um objeto JSON.'
-        return status, body
-    if 'ReportInterval' in new_state:
-        report_interval = new_state['ReportInterval']
-        if not isinstance(report_interval, Real) or report_interval <= 0.0:
-            status = ReplyStatus.BAD_REQUEST
-            body = '"ReportInterval" precisa um número real positivo'
-            return status, body
-    if 'UnitName' in new_state or 'UnitSymbol' in new_state:
-        status = ReplyStatus.DENIED
-        body = '"UnitName" e "UnitSymbol" são readonly.'
-        return status, body
-    if 'Location' in new_state:
-        try:
-            lat = new_state['Location']['Latitude']
-            long = new_state['Location']['Longitude']
-        except (TypeError, KeyError):
-            status = ReplyStatus.BAD_REQUEST
-            body = (
-                'Valor da chave "Location" precisa ser da forma '
-                '{"Latitude": <`float`>, "Longitude": <`float`>}'
-            )
-            return status, body
-        if not (isinstance(lat, Real) and isinstance(long, Real)):
-            status = ReplyStatus.BAD_REQUEST
-            body = (
-                'Valores das chaves "Latitude" e "Longitude" '
-                'precisam ser númericos (`float`)'
-            )
-            return status, body
-    if (set(new_state) - set(args.state)):
-        status = ReplyStatus.BAD_REQUEST
-        body = 'Existem chaves inválidas'
-        return status, body
-    body = json.dumps(args.state)
-    args.state.update(new_state)
-    return ReplyStatus.OK, body
-
-
-def request_handler(args, sock):
-    print('Tratando requisição do Gateway')
-    try:
-        sock.settimeout(args.base_timeout)
-        req = DeviceRequest()
-        req.ParseFromString(sock.recv(1024))
-        match req.type:
-            case RequestType.ACTION:
-                status = ReplyStatus.BAD_REQUEST
-                body = 'Sensor não realiza ações'
-            case RequestType.GET_STATE:
-                status = ReplyStatus.OK
-                body = json.dumps(args.state)
-            case RequestType.SET_STATE:
-                status, body = set_state(args, req.body)
-            case _:
-                status, body = ReplyStatus.UNKNOWN_TYPE, ''
-    except TimeoutError:
-        status = ReplyStatus.TIMEOUT
-        body = 'Requisição do cliente não chegou em tempo hábil'
-    except message.DecodeError:
-        status = ReplyStatus.BAD_REQUEST
-        body = 'Não foi possível compreender a requisição'
-    except Exception:
-        status = ReplyStatus.FAIL
-        body = 'Erro ao processar a requisição'
-    finally:
-        try:
-            reply = DeviceReply(status=status, body=body)
-            sock.send(reply.SerializeToString())
-        finally:
-            sock.shutdown(socket.SHUT_RDWR)
-            sock.close()
-
-
-def request_listener(args):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(('', args.port))
-        sock.listen()
-        print('Ouvindo requisições do gateway')
-        sock.settimeout(args.base_timeout)
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            while not args.stop_flag.is_set():
-                try:
-                    conn, _ = sock.accept()
-                except TimeoutError:
-                    continue
-                executor.submit(request_handler, args, conn)
+                time.sleep(args.report_interval)
 
 
 def _run(args):
     try:
-        rlistener = threading.Thread(target=request_listener, args=(args,))
         transmiter = threading.Thread(target=transmit_readings, args=(args,))
-        rlistener.start()
         transmiter.start()
         gateway_discoverer(args)
     except BaseException as e:
@@ -236,7 +124,6 @@ def _run(args):
         else:
             raise e
     finally:
-        rlistener.join()
         transmiter.join()
 
 
@@ -292,8 +179,8 @@ def main():
     args.host_ip = socket.gethostbyname(socket.gethostname())
     args.gateway_ip = None
     args.transmission_port = None
-    args.state = {
-        'ReportInterval': None,
+    args.report_interval = None
+    args.metadata = {
         'UnitName': 'Celsius',
         'UnitSymbol': '°C',
         'Location': {'Latitude': -3.733486, 'Longitude': -38.570860},

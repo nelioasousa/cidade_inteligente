@@ -8,7 +8,6 @@ from concurrent.futures import ThreadPoolExecutor
 from google.protobuf import message
 from messages_pb2 import Address, SensorReading
 from messages_pb2 import DeviceType, JoinRequest, JoinReply
-from messages_pb2 import DeviceRequest, DeviceReply, RequestType
 
 
 def multicast_location(args):
@@ -34,7 +33,7 @@ def join_handler(args, sock):
                 args.db.register_sensor(
                     name=req.device_info.name,
                     address=(req.device_address.ip, req.device_address.port),
-                    state=json.loads(req.device_info.state),
+                    metadata=json.loads(req.device_info.metadata),
                 )
         elif req.device_info.type is DeviceType.ACTUATOR:
             report_interval = args.actuators_report_interval
@@ -94,32 +93,6 @@ def sensors_listener(args):
                 args.db.add_sensor_data(name, data_item)
 
 
-def simulate_requests(args):
-    device = args.db.get_sensor('Temperature-01')
-    if device is None:
-        return
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        print('Solicitar ação do sensor')
-        sock.connect(device['address'])
-        sock.settimeout(args.base_timeout)
-        req = DeviceRequest(type=RequestType.ACTION, body='')
-        sock.send(req.SerializeToString())
-        reply = DeviceReply()
-        reply.ParseFromString(sock.recv(1024))
-        print(f'Ação bem-sucedida? {reply.status}: {reply.body}')
-        sock.shutdown(socket.SHUT_RDWR)
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        print('Requisitando estado do dispositivo')
-        sock.connect(device['address'])
-        sock.settimeout(args.base_timeout)
-        req = DeviceRequest(type=RequestType.GET_STATE)
-        sock.send(req.SerializeToString())
-        reply = DeviceReply()
-        reply.ParseFromString(sock.recv(1024))
-        print(f'Resultado da requisição: {reply.status}: {reply.body}')
-        sock.shutdown(socket.SHUT_RDWR)
-
-
 def _run(args):
     try:
         jlistener = threading.Thread(
@@ -136,8 +109,6 @@ def _run(args):
         multicaster.start()
         while True:
             time.sleep(10.0)
-            if args.db.sensors_count():
-                simulate_requests(args)
     except BaseException as e:
         args.stop_flag.set()
         if isinstance(e, KeyboardInterrupt):

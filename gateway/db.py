@@ -20,10 +20,10 @@ class Database:
         else:
             self.db = ({}, {})
 
-    def register_sensor(self, name, address, state):
+    def register_sensor(self, name, address, metadata):
         device = self.db[0].setdefault(name, {'name': name})
         device['address'] = address
-        device['state'] = state
+        device['metadata'] = metadata
         device['last_seen'] = time.monotonic()
         device.setdefault('data', SortedList(key=sensors_key))
     

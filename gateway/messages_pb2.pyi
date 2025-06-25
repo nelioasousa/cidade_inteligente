@@ -54,14 +54,16 @@ class Address(_message.Message):
     def __init__(self, ip: _Optional[str] = ..., port: _Optional[int] = ...) -> None: ...
 
 class DeviceInfo(_message.Message):
-    __slots__ = ("type", "name", "state")
+    __slots__ = ("type", "name", "state", "metadata")
     TYPE_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
+    METADATA_FIELD_NUMBER: _ClassVar[int]
     type: DeviceType
     name: str
     state: str
-    def __init__(self, type: _Optional[_Union[DeviceType, str]] = ..., name: _Optional[str] = ..., state: _Optional[str] = ...) -> None: ...
+    metadata: str
+    def __init__(self, type: _Optional[_Union[DeviceType, str]] = ..., name: _Optional[str] = ..., state: _Optional[str] = ..., metadata: _Optional[str] = ...) -> None: ...
 
 class JoinRequest(_message.Message):
     __slots__ = ("device_info", "device_address")
@@ -80,14 +82,16 @@ class JoinReply(_message.Message):
     def __init__(self, report_address: _Optional[_Union[Address, _Mapping]] = ..., report_interval: _Optional[float] = ...) -> None: ...
 
 class SensorReading(_message.Message):
-    __slots__ = ("sensor_name", "reading_value", "timestamp")
+    __slots__ = ("sensor_name", "reading_value", "timestamp", "metadata")
     SENSOR_NAME_FIELD_NUMBER: _ClassVar[int]
     READING_VALUE_FIELD_NUMBER: _ClassVar[int]
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
+    METADATA_FIELD_NUMBER: _ClassVar[int]
     sensor_name: str
     reading_value: str
     timestamp: str
-    def __init__(self, sensor_name: _Optional[str] = ..., reading_value: _Optional[str] = ..., timestamp: _Optional[str] = ...) -> None: ...
+    metadata: str
+    def __init__(self, sensor_name: _Optional[str] = ..., reading_value: _Optional[str] = ..., timestamp: _Optional[str] = ..., metadata: _Optional[str] = ...) -> None: ...
 
 class DeviceRequest(_message.Message):
     __slots__ = ("type", "body")
