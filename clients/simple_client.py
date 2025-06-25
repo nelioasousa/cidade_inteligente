@@ -5,6 +5,34 @@ import threading
 import logging
 from google.protobuf import message
 from messages_pb2 import SensorsReport
+from struct import unpack
+
+
+def recv_exaclty(sock, n, retries=2):
+    msg_chunks = []
+    remaining = n
+    while remaining:
+        try:
+            chunk = sock.recv(remaining)
+        except TimeoutError as e:
+            retries -= 1
+            if not retries:
+                raise e
+            continue
+        if not chunk:
+            raise EOFError('Socket closed before receiving all expected data')
+        msg_chunks.append(chunk)
+        remaining -= len(chunk)
+    return b''.join(msg_chunks)
+
+
+def recv_report(sock):
+    report_size = recv_exaclty(sock, 4)
+    report_size = unpack('!I', report_size)[0]
+    msg = recv_exaclty(sock, report_size)
+    report = SensorsReport()
+    report.ParseFromString(msg)
+    return report
 
 
 def connect_to_gateway(args):
@@ -19,12 +47,11 @@ def connect_to_gateway(args):
         logger.info('Conexão bem-sucedida')
         while not args.stop_flag.is_set():
             try:
-                report = SensorsReport()
-                report.ParseFromString(sock.recv(1024))
+                report = recv_report(sock)
                 if args.verbose:
                     logger.info(
-                        'Relatório de %d dispositivo(s) recebido',
-                        len(report.readings)
+                        'Relatório de %d dispositivo(s) recebido: %s',
+                        len(report.readings), report
                     )
             except TimeoutError:
                 logger.error('Timeout na comunicação com o Gateway')

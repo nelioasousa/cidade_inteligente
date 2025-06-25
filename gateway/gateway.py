@@ -4,6 +4,7 @@ import threading
 import time
 import json
 import logging
+from struct import pack
 from datetime import datetime
 from db import Database
 from concurrent.futures import ThreadPoolExecutor
@@ -149,10 +150,13 @@ def send_report(args, sock, addrs):
             is_online=(not_seen_since <= 2 * args.sensors_report_interval),
         )
     if args.verbose:
-        logger.info(f'Número de sensores reportados: {len(sensors_summary)}')
-    sensors_report = SensorsReport(readings=sensors_summary)
+        logger.info('Número de sensores reportados: %d', len(sensors_summary))
+    report_msg = SensorsReport(readings=sensors_summary).SerializeToString()
+    if len(report_msg) >= 2 ** 32:
+        raise BufferError('Message is too big')
+    report_msg = pack('!I', len(report_msg)) + report_msg
     try:
-        sock.send(sensors_report.SerializeToString())
+        sock.sendall(report_msg)
     except Exception as e:
         logger.error(
             'Erro ao enviar relatório para cliente em %s: (%s) %s',
