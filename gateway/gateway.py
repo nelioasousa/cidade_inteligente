@@ -300,7 +300,12 @@ def main():
 
     parser.add_argument(
         '-l', '--level', type=str, default='INFO',
-        help='Nível do logging. Valores permitidos são "INFO", "WARN", "ERROR".'
+        help='Nível do logging. Valores permitidos são "DEBUG", "INFO", "WARN" e "ERROR".'
+    )
+
+    parser.add_argument(
+        '-c', '--clear', action='store_true',
+        help='Limpar o banco de dados ao iniciar.'
     )
 
     args = parser.parse_args()
@@ -311,7 +316,7 @@ def main():
     args.base_timeout = 2.5
     args.client_timeout = 5.0
     args.host_ip = socket.gethostbyname(socket.gethostname())
-    args.db = Database()
+    args.db = Database(clear=args.clear)
     args.stop_flag = threading.Event()
     args.db_sensors_lock = threading.Lock()
 
