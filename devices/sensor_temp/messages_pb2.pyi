@@ -1,7 +1,8 @@
+from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from collections.abc import Mapping as _Mapping
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
 from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
@@ -11,39 +12,9 @@ class DeviceType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DT_UNSPECIFIED: _ClassVar[DeviceType]
     SENSOR: _ClassVar[DeviceType]
     ACTUATOR: _ClassVar[DeviceType]
-
-class RequestType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = ()
-    RT_UNSPECIFIED: _ClassVar[RequestType]
-    ACTION: _ClassVar[RequestType]
-    GET_STATE: _ClassVar[RequestType]
-    SET_STATE: _ClassVar[RequestType]
-
-class ReplyStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = ()
-    RS_UNSPECIFIED: _ClassVar[ReplyStatus]
-    OK: _ClassVar[ReplyStatus]
-    TIMEOUT: _ClassVar[ReplyStatus]
-    DENIED: _ClassVar[ReplyStatus]
-    FAIL: _ClassVar[ReplyStatus]
-    BAD_REQUEST: _ClassVar[ReplyStatus]
-    UNKNOWN_TYPE: _ClassVar[ReplyStatus]
-    UNKNOWN_ACTION: _ClassVar[ReplyStatus]
 DT_UNSPECIFIED: DeviceType
 SENSOR: DeviceType
 ACTUATOR: DeviceType
-RT_UNSPECIFIED: RequestType
-ACTION: RequestType
-GET_STATE: RequestType
-SET_STATE: RequestType
-RS_UNSPECIFIED: ReplyStatus
-OK: ReplyStatus
-TIMEOUT: ReplyStatus
-DENIED: ReplyStatus
-FAIL: ReplyStatus
-BAD_REQUEST: ReplyStatus
-UNKNOWN_TYPE: ReplyStatus
-UNKNOWN_ACTION: ReplyStatus
 
 class Address(_message.Message):
     __slots__ = ("ip", "port")
@@ -93,18 +64,8 @@ class SensorReading(_message.Message):
     metadata: str
     def __init__(self, sensor_name: _Optional[str] = ..., reading_value: _Optional[str] = ..., timestamp: _Optional[str] = ..., metadata: _Optional[str] = ...) -> None: ...
 
-class DeviceRequest(_message.Message):
-    __slots__ = ("type", "body")
-    TYPE_FIELD_NUMBER: _ClassVar[int]
-    BODY_FIELD_NUMBER: _ClassVar[int]
-    type: RequestType
-    body: str
-    def __init__(self, type: _Optional[_Union[RequestType, str]] = ..., body: _Optional[str] = ...) -> None: ...
-
-class DeviceReply(_message.Message):
-    __slots__ = ("status", "body")
-    STATUS_FIELD_NUMBER: _ClassVar[int]
-    BODY_FIELD_NUMBER: _ClassVar[int]
-    status: ReplyStatus
-    body: str
-    def __init__(self, status: _Optional[_Union[ReplyStatus, str]] = ..., body: _Optional[str] = ...) -> None: ...
+class SensorsReport(_message.Message):
+    __slots__ = ("readings",)
+    READINGS_FIELD_NUMBER: _ClassVar[int]
+    readings: _containers.RepeatedCompositeFieldContainer[SensorReading]
+    def __init__(self, readings: _Optional[_Iterable[_Union[SensorReading, _Mapping]]] = ...) -> None: ...

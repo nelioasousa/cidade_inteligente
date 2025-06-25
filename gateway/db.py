@@ -59,3 +59,14 @@ class Database:
     
     def is_sensor_registered(self, name):
         return name in self.db[0]
+
+    def get_sensors_readings(self):
+        result = []
+        for sensor, data in self.db[0].items():
+            result.append({
+                'sensor_name': sensor,
+                'reading_value': data['data'][-1][1],
+                'timestamp': data['data'][-1][0],
+                'metadata': data['metadata'],
+            })
+        return result

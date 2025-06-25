@@ -35,3 +35,7 @@ message SensorReading {
   string timestamp = 3;
   string metadata = 4;
 }
+
+message SensorsReport {
+  repeated SensorReading readings = 1;
+}

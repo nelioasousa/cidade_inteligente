@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from google.protobuf import message
 from messages_pb2 import Address, SensorReading
 from messages_pb2 import DeviceType, JoinRequest, JoinReply
+from messages_pb2 import SensorsReport
 
 
 def multicast_location(args):
@@ -96,6 +97,54 @@ def sensors_listener(args):
                 )
 
 
+def send_report(args, sock):
+    sensors_readings = args.db.get_sensors_readings()
+    for i, report_item in enumerate(sensors_readings):
+        sensors_readings[i] = SensorReading(
+            sensor_name=report_item['sensor_name'],
+            reading_value=str(report_item['reading_value']),
+            timestamp=report_item['timestamp'].isoformat(),
+            metadata=json.dumps(report_item['metadata']),
+        )
+    sensors_report = SensorsReport(readings=sensors_readings)
+    try:
+        sock.send(sensors_report.SerializeToString())
+    except Exception:
+        return
+
+
+def client_handler(args, sock):
+    try:
+        sock.settimeout(args.base_timeout)
+        while not args.stop_flag.is_set():
+            print(f'Enviando relatório para cliente em {sock.getpeername()}')
+            send_report(args, sock)
+            try:
+                _ = sock.recv(1024)
+            except TimeoutError:
+                continue
+    finally:
+        sock.shutdown(socket.SHUT_RDWR)
+        sock.close()
+
+
+def clients_listener(args):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('', args.clients_port))
+        sock.listen()
+        print('Ouvindo requisições dos clientes')
+        sock.settimeout(args.base_timeout)
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            while not args.stop_flag.is_set():
+                try:
+                    conn, addrs = sock.accept()
+                    print(f'Conectado com {addrs}')
+                except TimeoutError:
+                    continue
+                executor.submit(client_handler, args, conn)
+
+
 def _run(args):
     try:
         jlistener = threading.Thread(
@@ -104,11 +153,15 @@ def _run(args):
         slistener = threading.Thread(
             target=sensors_listener, args=(args,)
         )
+        clistener = threading.Thread(
+            target=clients_listener, args=(args,)
+        )
         multicaster = threading.Thread(
             target=multicast_location, args=(args,)
         )
         jlistener.start()
         slistener.start()
+        clistener.start()
         multicaster.start()
         while True:
             time.sleep(10.0)
@@ -122,6 +175,7 @@ def _run(args):
         multicaster.join()
         slistener.join()
         jlistener.join()
+        clistener.join()
         args.db.persist()
 
 
@@ -131,7 +185,7 @@ def main():
     parser = argparse.ArgumentParser(description='Gateway')
 
     parser.add_argument(
-        '--clients_port', type=int, default=50111,
+        '--clients_port', type=int, default=5000,
         help='Porta para comunicação com os clientes. Usa TCP.'
     )
 
@@ -178,7 +232,7 @@ def main():
     args = parser.parse_args()
     args.base_timeout = 2.5
     args.host_ip = socket.gethostbyname(socket.gethostname())
-    args.db = Database()
+    args.db = Database(clear=True)
     args.stop_flag = threading.Event()
     args.db_lock = threading.Lock()
 
