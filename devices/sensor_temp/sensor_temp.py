@@ -100,7 +100,7 @@ def transmit_readings(args):
             else:
                 reading = SensorReading(
                     sensor_name=args.name,
-                    reading_value=f'{get_reading(args):.2f}',
+                    reading_value=str(get_reading(args)),
                     timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
                     metadata=json.dumps(args.metadata),
                 )

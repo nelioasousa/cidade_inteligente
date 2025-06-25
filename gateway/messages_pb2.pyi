@@ -53,16 +53,18 @@ class JoinReply(_message.Message):
     def __init__(self, report_address: _Optional[_Union[Address, _Mapping]] = ..., report_interval: _Optional[float] = ...) -> None: ...
 
 class SensorReading(_message.Message):
-    __slots__ = ("sensor_name", "reading_value", "timestamp", "metadata")
+    __slots__ = ("sensor_name", "reading_value", "timestamp", "metadata", "is_online")
     SENSOR_NAME_FIELD_NUMBER: _ClassVar[int]
     READING_VALUE_FIELD_NUMBER: _ClassVar[int]
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     METADATA_FIELD_NUMBER: _ClassVar[int]
+    IS_ONLINE_FIELD_NUMBER: _ClassVar[int]
     sensor_name: str
     reading_value: str
     timestamp: str
     metadata: str
-    def __init__(self, sensor_name: _Optional[str] = ..., reading_value: _Optional[str] = ..., timestamp: _Optional[str] = ..., metadata: _Optional[str] = ...) -> None: ...
+    is_online: bool
+    def __init__(self, sensor_name: _Optional[str] = ..., reading_value: _Optional[str] = ..., timestamp: _Optional[str] = ..., metadata: _Optional[str] = ..., is_online: bool = ...) -> None: ...
 
 class SensorsReport(_message.Message):
     __slots__ = ("readings",)

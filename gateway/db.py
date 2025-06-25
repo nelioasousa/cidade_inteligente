@@ -68,5 +68,6 @@ class Database:
                 'reading_value': data['data'][-1][1],
                 'timestamp': data['data'][-1][0],
                 'metadata': data['metadata'],
+                'last_seen': data['last_seen']
             })
         return result

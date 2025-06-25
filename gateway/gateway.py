@@ -100,16 +100,19 @@ def sensors_listener(args):
 def send_report(args, sock):
     sensors_readings = args.db.get_sensors_readings()
     for i, report_item in enumerate(sensors_readings):
+        not_seen_since = (time.monotonic() - report_item['last_seen'])
         sensors_readings[i] = SensorReading(
             sensor_name=report_item['sensor_name'],
             reading_value=str(report_item['reading_value']),
             timestamp=report_item['timestamp'].isoformat(),
             metadata=json.dumps(report_item['metadata']),
+            is_online=(not_seen_since <= args.sensors_report_interval),
         )
     sensors_report = SensorsReport(readings=sensors_readings)
     try:
         sock.send(sensors_report.SerializeToString())
     except Exception:
+        print(f'Erro ao enviar relatório para {sock.getpeername()}')
         return
 
 
@@ -232,7 +235,7 @@ def main():
     args = parser.parse_args()
     args.base_timeout = 2.5
     args.host_ip = socket.gethostbyname(socket.gethostname())
-    args.db = Database(clear=True)
+    args.db = Database()
     args.stop_flag = threading.Event()
     args.db_lock = threading.Lock()
 
