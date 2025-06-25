@@ -84,7 +84,7 @@ def sensors_listener(args):
             name = reading.sensor_name
             if not args.db.is_sensor_registered(name):
                 continue
-            if name.startswith('Sensor-Temp'):
+            if name.startswith('Temperature'):
                 num_readings = args.db.count_sensor_readings(name) + 1
                 print(f'Leitura de temperatura recebida ({num_readings})')
                 reading_value = float(reading.reading_value)
@@ -95,7 +95,7 @@ def sensors_listener(args):
 
 
 def simulate_requests(args):
-    device = args.db.get_sensor('Sensor-Temp-01')
+    device = args.db.get_sensor('Temperature-01')
     if device is None:
         return
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:

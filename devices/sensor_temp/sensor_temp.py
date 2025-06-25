@@ -286,7 +286,7 @@ def main():
     )
 
     args = parser.parse_args()
-    args.name = f'Sensor-Temp-{args.name}'
+    args.name = f'Temperature-{args.name}'
     args.base_timeout = 2.5
     args.multicast_timeout = 5.0
     args.host_ip = socket.gethostbyname(socket.gethostname())
