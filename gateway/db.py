@@ -1,6 +1,7 @@
 import os
 import time
 import pickle
+import json
 from sortedcontainers import SortedList
 
 
@@ -43,9 +44,11 @@ class Database:
         except KeyError:
             return None
     
-    def add_sensor_data(self, name, data_item):
+    def add_sensor_reading(self, name, value, timestamp, metadata_string):
         sensor = self.db[0][name]
-        sensor['data'].add(data_item)
+        sensor['data'].add((timestamp, value))
+        if sensor['data'][-1][0] == timestamp:
+            sensor['metadata'] = json.loads(metadata_string)
         sensor['last_seen'] = time.monotonic()
     
     def count_sensor_readings(self, name):

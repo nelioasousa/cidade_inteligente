@@ -86,11 +86,14 @@ def sensors_listener(args):
             if name.startswith('Temperature'):
                 num_readings = args.db.count_sensor_readings(name) + 1
                 print(f'Leitura de temperatura recebida ({num_readings})')
-                reading_value = float(reading.reading_value)
+                value = float(reading.reading_value)
                 timestamp = datetime.fromisoformat(reading.timestamp)
-                data_item = (timestamp, reading_value)
+            else:
+                return
             with args.db_lock:
-                args.db.add_sensor_data(name, data_item)
+                args.db.add_sensor_reading(
+                    name, value, timestamp, reading.metadata
+                )
 
 
 def _run(args):
