@@ -65,12 +65,16 @@ class Database:
 
     def get_sensors_summary(self):
         summary = []
-        for sensor, data in self.db[0].items():
+        for sensor, sensor_data in self.db[0].items():
+            try:
+                timestamp, reading_value = sensor_data['data'][-1]
+            except IndexError:
+                continue
             summary.append({
                 'sensor_name': sensor,
-                'reading_value': data['data'][-1][1],
-                'timestamp': data['data'][-1][0],
-                'metadata': data['metadata'],
-                'last_seen': data['last_seen'],
+                'reading_value': reading_value,
+                'timestamp': timestamp,
+                'metadata': sensor_data['metadata'],
+                'last_seen': sensor_data['last_seen'],
             })
         return summary
