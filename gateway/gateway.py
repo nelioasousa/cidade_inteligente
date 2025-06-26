@@ -86,7 +86,7 @@ def registration_listener(args):
     logger = logging.getLogger('REGISTRATION_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind((args.host_ip, args.registration_port))
+        sock.bind(('', args.registration_port))
         sock.listen()
         logger.info(
             'Escutando requisições de registro em (%s, %s)',
@@ -105,7 +105,7 @@ def registration_listener(args):
 def sensors_listener(args):
     logger = logging.getLogger('SENSORS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.bind((args.host_ip, args.sensors_port))
+        sock.bind(('', args.sensors_port))
         logger.info(
             'Escutando por dados sensoriais em (%s, %s)',
             args.host_ip, args.sensors_port
@@ -176,7 +176,7 @@ def actuator_handler(args, sock, addrs):
 def actuators_listener(args):
     logger = logging.getLogger('ACTUATORS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind((args.host_ip, args.actuators_port))
+        sock.bind(('', args.actuators_port))
         sock.listen()
         logger.info(
             'Escutando por atualizações dos atuadores em (%s, %s)',
@@ -246,7 +246,7 @@ def clients_listener(args):
     logger = logging.getLogger('CLIENTS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind((args.host_ip, args.clients_port))
+        sock.bind(('', args.clients_port))
         sock.listen()
         logger.info(
             'Escutando pedidos de conexão dos clientes em (%s, %s)',

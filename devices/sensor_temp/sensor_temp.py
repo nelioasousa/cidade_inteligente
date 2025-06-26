@@ -14,7 +14,7 @@ def gateway_discoverer(args):
     logger = logging.getLogger('GATEWAY_DISCOVERER')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind((args.host_ip, args.multicast_port))
+        sock.bind(('', args.multicast_port))
         sock.setsockopt(
             socket.IPPROTO_IP,
             socket.IP_ADD_MEMBERSHIP,
