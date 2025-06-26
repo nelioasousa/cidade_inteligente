@@ -1,6 +1,7 @@
 import os
 import time
 import pickle
+import datetime
 from sortedcontainers import SortedList
 
 
@@ -20,7 +21,7 @@ class Database:
         device = self.db[0].setdefault(name, {'name': name})
         device['address'] = address
         device['metadata'] = metadata
-        device['last_seen'] = time.monotonic()
+        device['last_seen'] = (datetime.date.today(), time.monotonic())
         device.setdefault('data', SortedList())
 
     def register_actuator(self, name, address, state, metadata):
@@ -28,7 +29,7 @@ class Database:
         device['address'] = address
         device['state'] = state
         device['metadata'] = metadata
-        device['last_seen'] = time.monotonic()
+        device['last_seen'] = (datetime.date.today(), time.monotonic())
         device.setdefault('data', SortedList())
 
     def persist(self):
@@ -67,7 +68,7 @@ class Database:
         sensor['data'].add((timestamp, value))
         if sensor['data'][-1][0] == timestamp:
             sensor['metadata'] = metadata
-        sensor['last_seen'] = time.monotonic()
+        sensor['last_seen'] = (datetime.date.today(), time.monotonic())
         return True
     
     def add_actuator_update(self, name, value, timestamp, state, metadata):
@@ -79,7 +80,7 @@ class Database:
         if actuator['data'][-1][0] == timestamp:
             actuator['state'] = state
             actuator['metadata'] = metadata
-        actuator['last_seen'] = time.monotonic()
+        actuator['last_seen'] = (datetime.date.today(), time.monotonic())
         return True
 
     def count_sensor_readings(self, name):

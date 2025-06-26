@@ -2,6 +2,7 @@ import time
 import json
 import socket
 import logging
+import datetime
 import threading
 from struct import pack
 from concurrent.futures import ThreadPoolExecutor
@@ -14,14 +15,20 @@ def send_report(args, sock, addrs):
         logger.info('Enviando relatório para cliente em %s', addrs)
     with args.db_sensors_lock:
         sensors_summary = args.db.get_sensors_summary()
+    today = datetime.date.today()
+    now_clock = time.monotonic()
+    tolerance = args.report_tolerance * args.sensors_report_interval
     for i, sensor_summary in enumerate(sensors_summary):
-        not_seen_since = (time.monotonic() - sensor_summary['last_seen'])
+        last_seen = sensor_summary['last_seen']
+        is_online = (
+            last_seen[0] == today and (now_clock - last_seen[1]) < tolerance
+        )
         sensors_summary[i] = SensorReading(
             device_name=sensor_summary['device_name'],
             reading_value=str(sensor_summary['reading_value']),
             timestamp=sensor_summary['timestamp'].isoformat(),
             metadata=json.dumps(sensor_summary['metadata']),
-            is_online=(not_seen_since <= 2 * args.sensors_report_interval),
+            is_online=is_online,
         )
     if args.verbose:
         logger.info('Número de sensores reportados: %d', len(sensors_summary))
