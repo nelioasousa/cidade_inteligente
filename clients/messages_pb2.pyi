@@ -73,18 +73,20 @@ class SensorsReport(_message.Message):
     def __init__(self, readings: _Optional[_Iterable[_Union[SensorReading, _Mapping]]] = ...) -> None: ...
 
 class ActuatorUpdate(_message.Message):
-    __slots__ = ("device_name", "action_value", "timestamp", "state", "is_online")
+    __slots__ = ("device_name", "action_value", "timestamp", "state", "metadata", "is_online")
     DEVICE_NAME_FIELD_NUMBER: _ClassVar[int]
     ACTION_VALUE_FIELD_NUMBER: _ClassVar[int]
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
+    METADATA_FIELD_NUMBER: _ClassVar[int]
     IS_ONLINE_FIELD_NUMBER: _ClassVar[int]
     device_name: str
     action_value: str
     timestamp: str
     state: str
+    metadata: str
     is_online: bool
-    def __init__(self, device_name: _Optional[str] = ..., action_value: _Optional[str] = ..., timestamp: _Optional[str] = ..., state: _Optional[str] = ..., is_online: bool = ...) -> None: ...
+    def __init__(self, device_name: _Optional[str] = ..., action_value: _Optional[str] = ..., timestamp: _Optional[str] = ..., state: _Optional[str] = ..., metadata: _Optional[str] = ..., is_online: bool = ...) -> None: ...
 
 class ActuatorsReport(_message.Message):
     __slots__ = ("updates",)
