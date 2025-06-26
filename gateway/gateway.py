@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from google.protobuf import message
 from messages_pb2 import Address, SensorReading
 from messages_pb2 import DeviceType, JoinRequest, JoinReply
+from messages_pb2 import ActuatorUpdate
 from messages_pb2 import SensorsReport
 
 
@@ -53,8 +54,13 @@ def join_handler(args, sock, addrs):
         elif req.device_info.type is DeviceType.ACTUATOR:
             report_interval = args.actuators_report_interval
             report_port = args.actuators_port
-            # with args.db_actuators_lock:
-            #     args.db.register_actuator(...)
+            with args.db_actuators_lock:
+                args.db.register_actuator(
+                    name=req.device_info.name,
+                    address=(req.device_address.ip, req.device_address.port),
+                    state=json.loads(req.device_info.state),
+                    metadata=json.loads(req.device_info.metadata),
+                )
         else:
             raise RuntimeError('Invalid device type')
         reply = JoinReply(
@@ -80,7 +86,7 @@ def registration_listener(args):
     logger = logging.getLogger('REGISTRATION_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(('', args.registration_port))
+        sock.bind((args.host_ip, args.registration_port))
         sock.listen()
         logger.info(
             'Escutando requisições de registro em (%s, %s)',
@@ -99,7 +105,7 @@ def registration_listener(args):
 def sensors_listener(args):
     logger = logging.getLogger('SENSORS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.bind(('', args.sensors_port))
+        sock.bind((args.host_ip, args.sensors_port))
         logger.info(
             'Escutando por dados sensoriais em (%s, %s)',
             args.host_ip, args.sensors_port
@@ -119,18 +125,77 @@ def sensors_listener(args):
                 metadata = json.loads(reading.metadata)
                 if args.verbose:
                     logger.info(
-                        'Leitura de temperatura recebida: '
-                        '(%s, %s %s, %s)',
+                        'Leitura de temperatura recebida: (%s, %s %s, %s)',
                         name, value, metadata['UnitSymbol'], reading.timestamp
                     )
             else:
-                return
+                continue
             with args.db_sensors_lock:
                 result = args.db.add_sensor_reading(name, value, timestamp, metadata)
-                if args.verbose and not result:
-                    logger.info(
-                        'Recebendo leituras de um sensor desconhecido: %s', name
+            if args.verbose and not result:
+                logger.info(
+                    'Recebendo leituras de um sensor desconhecido: %s', name
+                )
+
+
+def actuator_handler(args, sock, addrs):
+    logger = logging.getLogger(f'ACTUATOR_HANDLER_{threading.get_ident()}')
+    logger.info('Gerenciando conexão com o atuador em %s', addrs)
+    try:
+        msg, _ = sock.recvfrom(1024)
+        update = ActuatorUpdate()
+        update.ParseFromString(msg)
+    except (TimeoutError, message.DecodeError):
+        return
+    finally:
+        sock.shutdown(socket.SHUT_RDWR)
+        sock.close()
+    name = update.device_name
+    if name.startswith('Lamp'):
+        value = update.action_value.strip().upper()
+        timestamp = datetime.fromisoformat(update.timestamp)
+        state = json.loads(update.state)
+        metadata = json.loads(update.metadata)
+        if args.verbose:
+            logger.info(
+                'Atualização de lâmpada recebida: (%s, %s, %s)',
+                name, update.timestamp, value
+            )
+    else:
+        return
+    with args.db_actuators_lock:
+        result = args.db.add_actuator_update(
+            name, value, timestamp, state, metadata
+        )
+    if args.verbose and not result:
+        logger.info(
+            'Recebendo atualizações de um atuador desconhecido: %s', name
+        )
+
+
+def actuators_listener(args):
+    logger = logging.getLogger('ACTUATORS_LISTENER')
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind((args.host_ip, args.actuators_port))
+        sock.listen()
+        logger.info(
+            'Escutando por atualizações dos atuadores em (%s, %s)',
+            args.host_ip, args.actuators_port
+        )
+        sock.settimeout(args.base_timeout)
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            while not args.stop_flag.is_set():
+                try:
+                    conn, addrs = sock.accept()
+                except TimeoutError:
+                    continue
+                except Exception as e:
+                    logger.error(
+                        'Erro ao tentar conexão com um atuador: (%s) %s',
+                        type(e).__name__, e
                     )
+                    continue
+                executor.submit(actuator_handler, args, conn, addrs)
 
 
 def send_report(args, sock, addrs):
@@ -181,7 +246,7 @@ def clients_listener(args):
     logger = logging.getLogger('CLIENTS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(('', args.clients_port))
+        sock.bind((args.host_ip, args.clients_port))
         sock.listen()
         logger.info(
             'Escutando pedidos de conexão dos clientes em (%s, %s)',
@@ -199,6 +264,7 @@ def clients_listener(args):
                         'Erro ao tentar conexão com um novo cliente: (%s) %s',
                         type(e).__name__, e
                     )
+                    continue
                 executor.submit(client_handler, args, conn, addrs)
 
 
@@ -215,11 +281,15 @@ def _run(args):
         slistener = threading.Thread(
             target=sensors_listener, args=(args,)
         )
+        alistener = threading.Thread(
+            target=actuators_listener, args=(args,)
+        )
         multicaster = threading.Thread(
             target=multicast_location, args=(args,)
         )
         jlistener.start()
         slistener.start()
+        alistener.start()
         multicaster.start()
         clients_listener(args)
     except BaseException as e:
@@ -229,9 +299,10 @@ def _run(args):
         else:
             raise e
     finally:
-        multicaster.join()
-        slistener.join()
         jlistener.join()
+        slistener.join()
+        alistener.join()
+        multicaster.join()
         args.db.persist()
 
 
@@ -311,6 +382,7 @@ def main():
     args.db = Database(clear=args.clear)
     args.stop_flag = threading.Event()
     args.db_sensors_lock = threading.Lock()
+    args.db_actuators_lock = threading.Lock()
 
     return _run(args)
 

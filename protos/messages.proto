@@ -46,7 +46,8 @@ message ActuatorUpdate {
   string action_value = 2;
   string timestamp = 3;
   string state = 4;
-  bool is_online = 5;
+  string metadata = 5;
+  bool is_online = 6;
 }
 
 message ActuatorsReport {
