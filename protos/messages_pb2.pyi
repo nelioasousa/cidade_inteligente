@@ -12,9 +12,31 @@ class DeviceType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DT_UNSPECIFIED: _ClassVar[DeviceType]
     SENSOR: _ClassVar[DeviceType]
     ACTUATOR: _ClassVar[DeviceType]
+
+class CommandType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    CT_UNSPECIFIED: _ClassVar[CommandType]
+    ACTION: _ClassVar[CommandType]
+    GET_STATE: _ClassVar[CommandType]
+    SET_STATE: _ClassVar[CommandType]
+
+class ComplyStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    CS_UNSPECIFIED: _ClassVar[ComplyStatus]
+    OK: _ClassVar[ComplyStatus]
+    FAIL: _ClassVar[ComplyStatus]
+    UNKNOWN_ACTION: _ClassVar[ComplyStatus]
 DT_UNSPECIFIED: DeviceType
 SENSOR: DeviceType
 ACTUATOR: DeviceType
+CT_UNSPECIFIED: CommandType
+ACTION: CommandType
+GET_STATE: CommandType
+SET_STATE: CommandType
+CS_UNSPECIFIED: ComplyStatus
+OK: ComplyStatus
+FAIL: ComplyStatus
+UNKNOWN_ACTION: ComplyStatus
 
 class Address(_message.Message):
     __slots__ = ("ip", "port")
@@ -45,12 +67,10 @@ class JoinRequest(_message.Message):
     def __init__(self, device_info: _Optional[_Union[DeviceInfo, _Mapping]] = ..., device_address: _Optional[_Union[Address, _Mapping]] = ...) -> None: ...
 
 class JoinReply(_message.Message):
-    __slots__ = ("report_port", "report_interval")
+    __slots__ = ("report_port",)
     REPORT_PORT_FIELD_NUMBER: _ClassVar[int]
-    REPORT_INTERVAL_FIELD_NUMBER: _ClassVar[int]
     report_port: int
-    report_interval: float
-    def __init__(self, report_port: _Optional[int] = ..., report_interval: _Optional[float] = ...) -> None: ...
+    def __init__(self, report_port: _Optional[int] = ...) -> None: ...
 
 class SensorReading(_message.Message):
     __slots__ = ("device_name", "reading_value", "timestamp", "metadata", "is_online")
@@ -93,3 +113,19 @@ class ActuatorsReport(_message.Message):
     UPDATES_FIELD_NUMBER: _ClassVar[int]
     updates: _containers.RepeatedCompositeFieldContainer[ActuatorUpdate]
     def __init__(self, updates: _Optional[_Iterable[_Union[ActuatorUpdate, _Mapping]]] = ...) -> None: ...
+
+class ActuatorCommand(_message.Message):
+    __slots__ = ("type", "body")
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    BODY_FIELD_NUMBER: _ClassVar[int]
+    type: CommandType
+    body: str
+    def __init__(self, type: _Optional[_Union[CommandType, str]] = ..., body: _Optional[str] = ...) -> None: ...
+
+class ActuatorComply(_message.Message):
+    __slots__ = ("status", "body")
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    BODY_FIELD_NUMBER: _ClassVar[int]
+    status: ComplyStatus
+    body: str
+    def __init__(self, status: _Optional[_Union[ComplyStatus, str]] = ..., body: _Optional[str] = ...) -> None: ...
