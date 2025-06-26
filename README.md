@@ -23,7 +23,7 @@ Um sistema distribuído para aprendizado de comunicação entre processos. Ele s
 
 ```
 cidade_inteligente/
-├── cliente_flutter/               # Aplicativo Flutter
+├── flutter_client/               # Aplicativo Flutter
 │   └── lib/
 │       ├── main.dart              # Arquivo principal do app
 │       ├── simulador_falhas.dart  # Simulação de falhas
@@ -77,7 +77,7 @@ $ protoc --js_out=import_style=commonjs,binary:. protos/mensagem.proto
 
 - Flutter
 ```bash
-$ protoc --dart_out=cliente_flutter/lib/protos protos/mensagem.proto
+$ protoc --dart_out=flutter_client/lib/protos protos/mensagem.proto
 ```
 
 ### 3. Rodar os componentes (em terminais separados)
@@ -98,6 +98,6 @@ $ node dispositivos/poste_node/poste.js
 
 - Aplicativo Flutter
 ```bash
-$ cd cliente_flutter
+$ cd flutter_client
 $ flutter run
 ```
