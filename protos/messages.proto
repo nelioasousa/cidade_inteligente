@@ -53,3 +53,26 @@ message ActuatorUpdate {
 message ActuatorsReport {
   repeated ActuatorUpdate updates = 1;
 }
+
+enum CommandType {
+  CT_UNSPECIFIED = 0;
+  ACTION = 1;
+  SET_STATE = 2;
+}
+
+message ActuatorCommand {
+  CommandType type = 1;
+  string body = 2;
+}
+
+enum ComplyStatus {
+  CS_UNSPECIFIED = 0;
+  OK = 1;
+  FAIL = 2;
+  UNKNOWN_ACTION = 3;
+}
+
+message ActuatorComply {
+  ComplyStatus status = 1;
+  string body;
+}
