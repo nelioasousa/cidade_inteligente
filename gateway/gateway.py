@@ -88,13 +88,8 @@ def main():
     )
 
     parser.add_argument(
-        '--sensors_report_interval', type=float, default=1.0,
-        help='Intervalo de envio de dados dos sensores.'
-    )
-
-    parser.add_argument(
-        '--actuators_report_interval', type=float, default=5.0,
-        help='Intervalo de envio de dados dos atuadores.'
+        '--sensors_tolerance', type=float, default=10.0,
+        help='Quantos segundos sem receber dados de um sensor para considerá-lo offline.'
     )
 
     parser.add_argument(
@@ -119,7 +114,6 @@ def main():
         args.verbose = True
     args.base_timeout = 2.5
     args.client_timeout = 5.0
-    args.report_tolerance = 1.5
     args.host_ip = socket.gethostbyname(socket.gethostname())
     args.db = Database(clear=args.clear)
     args.stop_flag = threading.Event()

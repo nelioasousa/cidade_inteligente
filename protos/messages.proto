@@ -26,7 +26,6 @@ message JoinRequest {
 
 message JoinReply {
   uint32 report_port = 1;
-  float report_interval = 2;
 }
 
 message SensorReading {
@@ -74,5 +73,5 @@ enum ComplyStatus {
 
 message ActuatorComply {
   ComplyStatus status = 1;
-  string body;
+  string body = 2;
 }

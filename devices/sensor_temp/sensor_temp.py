@@ -61,7 +61,6 @@ def gateway_discoverer(args):
 def disconnect_device(args):
     args.gateway_ip = None
     args.transmission_port = None
-    args.report_interval = None
     return
 
 
@@ -93,7 +92,6 @@ def try_to_connect(args, addrs):
             return False
     args.gateway_ip = addrs[0]
     args.transmission_port = join_reply.report_port
-    args.report_interval = join_reply.report_interval
     logger.info(
         'Conexão bem-sucedida com o Gateway em (%s, %s)',
         addrs[0], join_reply.report_port
@@ -177,6 +175,11 @@ def main():
     )
 
     parser.add_argument(
+        '--report_interval', type=float, default=5.0,
+        help='Intervalo entre o envio de leituras.'
+    )
+
+    parser.add_argument(
         '--temperature', type=float, default=25.0,
         help='Temperatura inicial do sensor em °C.'
     )
@@ -217,7 +220,6 @@ def main():
     args.host_ip = socket.gethostbyname(socket.gethostname())
     args.gateway_ip = None
     args.transmission_port = None
-    args.report_interval = None
     args.metadata = {
         'UnitName': 'Celsius',
         'UnitSymbol': '°C',

@@ -35,7 +35,6 @@ def registration_handler(args, sock, addrs):
         req = JoinRequest()
         req.ParseFromString(sock.recv(1024))
         if req.device_info.type is DeviceType.SENSOR:
-            report_interval = args.sensors_report_interval
             report_port = args.sensors_port
             with args.db_sensors_lock:
                 args.db.register_sensor(
@@ -44,7 +43,6 @@ def registration_handler(args, sock, addrs):
                     metadata=json.loads(req.device_info.metadata),
                 )
         elif req.device_info.type is DeviceType.ACTUATOR:
-            report_interval = args.actuators_report_interval
             report_port = args.actuators_port
             with args.db_actuators_lock:
                 args.db.register_actuator(
@@ -55,10 +53,7 @@ def registration_handler(args, sock, addrs):
                 )
         else:
             raise RuntimeError('Invalid device type')
-        reply = JoinReply(
-            report_port=report_port,
-            report_interval=report_interval,
-        )
+        reply = JoinReply(report_port=report_port)
         sock.send(reply.SerializeToString())
         logger.info(
             'Ingresso bem-sucedido do dispositivo %s em %s',

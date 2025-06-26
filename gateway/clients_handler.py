@@ -17,11 +17,11 @@ def send_report(args, sock, addrs):
         sensors_summary = args.db.get_sensors_summary()
     today = datetime.date.today()
     now_clock = time.monotonic()
-    tolerance = args.report_tolerance * args.sensors_report_interval
     for i, sensor_summary in enumerate(sensors_summary):
         last_seen = sensor_summary['last_seen']
         is_online = (
-            last_seen[0] == today and (now_clock - last_seen[1]) < tolerance
+            last_seen[0] == today
+            and (now_clock - last_seen[1]) <= args.sensors_tolerance
         )
         sensors_summary[i] = SensorReading(
             device_name=sensor_summary['device_name'],
