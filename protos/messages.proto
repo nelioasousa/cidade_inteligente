@@ -56,7 +56,8 @@ message ActuatorsReport {
 enum CommandType {
   CT_UNSPECIFIED = 0;
   ACTION = 1;
-  SET_STATE = 2;
+  GET_STATE = 2;
+  SET_STATE = 3;
 }
 
 message ActuatorCommand {
