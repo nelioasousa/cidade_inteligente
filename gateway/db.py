@@ -43,12 +43,6 @@ class Database:
         except KeyError:
             return None
     
-    def get_sensor_data(self, name):
-        try:
-            return self.db[0][name]['data']
-        except KeyError:
-            return None
-    
     def get_actuator(self, name):
         try:
             return self.db[1][name]
@@ -90,15 +84,6 @@ class Database:
             return True
         except KeyError:
             return False
-
-    def count_sensor_readings(self, name):
-        return len(self.db[0][name]['data'])
-
-    def sensors_count(self):
-        return len(self.db[0])
-    
-    def is_sensor_registered(self, name):
-        return name in self.db[0]
 
     def get_sensors_summary(self):
         summary = []
