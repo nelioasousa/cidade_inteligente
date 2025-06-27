@@ -68,7 +68,7 @@ class Database:
         sensor['data'].add((timestamp, value))
         if sensor['data'][-1][0] == timestamp:
             sensor['metadata'] = metadata
-        sensor['last_seen'] = (datetime.date.today(), time.monotonic())
+            sensor['last_seen'] = (datetime.date.today(), time.monotonic())
         return True
     
     def add_actuator_update(self, name, value, timestamp, state, metadata):
@@ -80,7 +80,7 @@ class Database:
         if actuator['data'][-1][0] == timestamp:
             actuator['state'] = state
             actuator['metadata'] = metadata
-        actuator['last_seen'] = (datetime.date.today(), time.monotonic())
+            actuator['last_seen'] = (datetime.date.today(), time.monotonic())
         return True
 
     def count_sensor_readings(self, name):
