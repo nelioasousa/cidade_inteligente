@@ -18,19 +18,20 @@ class Database:
             self.db = ({}, {})
 
     def register_sensor(self, name, address, metadata):
-        device = self.db[0].setdefault(name, {'name': name})
-        device['address'] = address
-        device['metadata'] = metadata
-        device['last_seen'] = (datetime.date.today(), time.monotonic())
-        device.setdefault('data', SortedList())
+        sensor = self.db[0].setdefault(name, {'name': name})
+        sensor['address'] = address
+        sensor['metadata'] = metadata
+        sensor['last_seen'] = (datetime.date.today(), time.monotonic())
+        sensor.setdefault('data', SortedList())
 
     def register_actuator(self, name, address, state, metadata, timestamp):
-        device = self.db[1].setdefault(name, {'name': name})
-        device['address'] = address
-        device['state'] = state
-        device['metadata'] = metadata
-        device['timestamp'] = timestamp
-        device['last_seen'] = (datetime.date.today(), time.monotonic())
+        actuator = self.db[1].setdefault(name, {'name': name})
+        actuator['address'] = address
+        actuator['state'] = state
+        actuator['metadata'] = metadata
+        actuator['timestamp'] = timestamp
+        actuator['online'] = True
+        actuator['last_seen'] = (datetime.date.today(), time.monotonic())
 
     def persist(self):
         with open(self.db_file, mode='bw') as db:
@@ -54,6 +55,12 @@ class Database:
         except KeyError:
             return None
     
+    def get_actuator_by_address(self, address):
+        for actuator in self.db[1].values():
+            if actuator['address'] == address:
+                return actuator
+        return None
+
     def add_sensor_reading(self, name, value, metadata, timestamp):
         try:
             sensor = self.db[0][name]
@@ -73,8 +80,16 @@ class Database:
         actuator['state'] = state
         actuator['metadata'] = metadata
         actuator['timestamp'] = timestamp
+        actuator['online'] = True
         actuator['last_seen'] = (datetime.date.today(), time.monotonic())
         return True
+
+    def mark_actuator_as_offline(self, name):
+        try:
+            self.db[1][name]['online'] = False
+            return True
+        except KeyError:
+            return False
 
     def count_sensor_readings(self, name):
         return len(self.db[0][name]['data'])
