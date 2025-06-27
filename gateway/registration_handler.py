@@ -35,7 +35,7 @@ def registration_handler(args, sock, addrs):
         sock.settimeout(args.base_timeout)
         req = JoinRequest()
         req.ParseFromString(sock.recv(1024))
-        if req.device_info.type is DeviceType.SENSOR:
+        if req.device_info.type is DeviceType.DT_SENSOR:
             report_port = args.sensors_port
             with args.db_sensors_lock:
                 args.db.register_sensor(
@@ -43,7 +43,7 @@ def registration_handler(args, sock, addrs):
                     address=(req.device_address.ip, req.device_address.port),
                     metadata=json.loads(req.device_info.metadata),
                 )
-        elif req.device_info.type is DeviceType.ACTUATOR:
+        elif req.device_info.type is DeviceType.DT_ACTUATOR:
             report_port = args.actuators_port
             with args.db_actuators_lock:
                 args.db.register_actuator(

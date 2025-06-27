@@ -46,7 +46,7 @@ def send_command(args, actuator_name, command_message_bytes):
             return None
         reply = ActuatorComply()
         reply.ParseFromString(msg)
-        if reply.status is ComplyStatus.OK:
+        if reply.status is ComplyStatus.CS_OK:
             name = reply.update.device_name
             state = json.loads(reply.update.state)
             metadata = json.loads(reply.update.metadata)

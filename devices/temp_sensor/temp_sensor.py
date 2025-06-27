@@ -72,7 +72,7 @@ def try_to_connect(args, addrs):
         try:
             sock.connect(addrs)
             device_info = DeviceInfo(
-                type=DeviceType.SENSOR,
+                type=DeviceType.DT_SENSOR,
                 name=args.name,
                 metadata=json.dumps(args.metadata),
             )
