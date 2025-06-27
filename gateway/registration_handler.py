@@ -3,6 +3,7 @@ import json
 import socket
 import logging
 import threading
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import Address, JoinRequest, JoinReply, DeviceType
 
@@ -50,6 +51,7 @@ def registration_handler(args, sock, addrs):
                     address=(req.device_address.ip, req.device_address.port),
                     state=json.loads(req.device_info.state),
                     metadata=json.loads(req.device_info.metadata),
+                    timestamp=datetime.fromisoformat(req.timestamp),
                 )
         else:
             raise RuntimeError('Invalid device type')

@@ -17,6 +17,7 @@ message DeviceInfo {
   string name = 2;
   string state = 3;
   string metadata = 4;
+  string timestamp = 5;
 }
 
 message JoinRequest {
@@ -42,11 +43,10 @@ message SensorsReport {
 
 message ActuatorUpdate {
   string device_name = 1;
-  string action_value = 2;
-  string timestamp = 3;
-  string state = 4;
-  string metadata = 5;
-  bool is_online = 6;
+  string state = 2;
+  string metadata = 3;
+  string timestamp = 4;
+  bool is_online = 5;
 }
 
 message ActuatorsReport {

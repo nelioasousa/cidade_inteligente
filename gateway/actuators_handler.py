@@ -1,8 +1,8 @@
 import json
-import datetime
 import socket
 import logging
 import threading
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from google.protobuf import message
 from messages_pb2 import ActuatorUpdate
@@ -22,21 +22,18 @@ def actuator_handler(args, sock, addrs):
         sock.close()
     name = update.device_name
     if name.startswith('Lamp'):
-        value = update.action_value.strip().upper()
-        timestamp = datetime.fromisoformat(update.timestamp)
         state = json.loads(update.state)
         metadata = json.loads(update.metadata)
+        timestamp = datetime.fromisoformat(update.timestamp)
         if args.verbose:
             logger.info(
                 'Atualização de lâmpada recebida: (%s, %s, %s)',
-                name, update.timestamp, value
+                name, update.timestamp, 'ON' if state['is_on'] else 'OFF'
             )
     else:
         return
     with args.db_actuators_lock:
-        result = args.db.add_actuator_update(
-            name, value, timestamp, state, metadata
-        )
+        result = args.db.add_actuator_update(name, state, metadata, timestamp)
     if args.verbose and not result:
         logger.info(
             'Recebendo atualizações de um atuador desconhecido: %s', name

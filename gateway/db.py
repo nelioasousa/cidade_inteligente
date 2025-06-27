@@ -24,13 +24,13 @@ class Database:
         device['last_seen'] = (datetime.date.today(), time.monotonic())
         device.setdefault('data', SortedList())
 
-    def register_actuator(self, name, address, state, metadata):
+    def register_actuator(self, name, address, state, metadata, timestamp):
         device = self.db[1].setdefault(name, {'name': name})
         device['address'] = address
         device['state'] = state
         device['metadata'] = metadata
+        device['timestamp'] = timestamp
         device['last_seen'] = (datetime.date.today(), time.monotonic())
-        device.setdefault('data', SortedList())
 
     def persist(self):
         with open(self.db_file, mode='bw') as db:
@@ -54,13 +54,7 @@ class Database:
         except KeyError:
             return None
     
-    def get_actuator_data(self, name):
-        try:
-            return self.db[1][name]['data']
-        except KeyError:
-            return None
-    
-    def add_sensor_reading(self, name, value, timestamp, metadata):
+    def add_sensor_reading(self, name, value, metadata, timestamp):
         try:
             sensor = self.db[0][name]
         except KeyError:
@@ -71,16 +65,15 @@ class Database:
             sensor['last_seen'] = (datetime.date.today(), time.monotonic())
         return True
     
-    def add_actuator_update(self, name, value, timestamp, state, metadata):
+    def add_actuator_update(self, name, state, metadata, timestamp):
         try:
             actuator = self.db[1][name]
         except KeyError:
             return False
-        actuator['data'].add((timestamp, value))
-        if actuator['data'][-1][0] == timestamp:
-            actuator['state'] = state
-            actuator['metadata'] = metadata
-            actuator['last_seen'] = (datetime.date.today(), time.monotonic())
+        actuator['state'] = state
+        actuator['metadata'] = metadata
+        actuator['timestamp'] = timestamp
+        actuator['last_seen'] = (datetime.date.today(), time.monotonic())
         return True
 
     def count_sensor_readings(self, name):
