@@ -61,6 +61,9 @@ enum CommandType {
 
 message ActuatorCommand {
   CommandType type = 1;
+  // empty if CommandType.GET_STATE
+  // OR action name if CommandType.ACTION
+  // OR stringfyed JSON state if CommandType.SET_STATE
   string body = 2;
 }
 
@@ -73,7 +76,7 @@ enum ComplyStatus {
 
 message ActuatorComply {
   ComplyStatus status = 1;
-  string body = 2;
+  ActuatorUpdate update = 2;
 }
 
 
