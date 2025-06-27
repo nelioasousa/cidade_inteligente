@@ -117,6 +117,7 @@ def main():
     args.host_ip = socket.gethostbyname(socket.gethostname())
     args.db = Database(clear=args.clear)
     args.stop_flag = threading.Event()
+    args.pending_actuators_updates = threading.Event()
     args.db_sensors_lock = threading.Lock()
     args.db_actuators_lock = threading.Lock()
 

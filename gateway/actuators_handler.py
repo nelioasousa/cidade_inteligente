@@ -34,6 +34,8 @@ def actuator_handler(args, sock, addrs):
         return
     with args.db_actuators_lock:
         result = args.db.add_actuator_update(name, state, metadata, timestamp)
+        if result:
+            args.pending_actuators_updates.set()
     if args.verbose and not result:
         logger.info(
             'Recebendo atualizações de um atuador desconhecido: %s', name
