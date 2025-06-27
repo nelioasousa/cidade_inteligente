@@ -35,7 +35,7 @@ def sensors_listener(args):
             else:
                 continue
             with args.db_sensors_lock:
-                result = args.db.add_sensor_reading(name, value, timestamp, metadata)
+                result = args.db.add_sensor_reading(name, value, metadata, timestamp)
             if args.verbose and not result:
                 logger.info(
                     'Recebendo leituras de um sensor desconhecido: %s', name

@@ -32,7 +32,7 @@ def send_report(args, sock, addrs):
         )
     if args.verbose:
         logger.info('Número de sensores reportados: %d', len(sensors_summary))
-    report_msg = SensorsReport(readings=sensors_summary).SerializeToString()
+    report_msg = SensorsReport(devices=sensors_summary).SerializeToString()
     report_msg = pack('!I', len(report_msg)) + report_msg
     sock.sendall(report_msg)
 

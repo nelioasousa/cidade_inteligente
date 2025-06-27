@@ -51,7 +51,7 @@ def connect_to_gateway(args):
                 if args.verbose:
                     logger.info(
                         'Relatório de %d dispositivo(s) recebido: %s',
-                        len(report.readings), report
+                        len(report.devices), report
                     )
             except TimeoutError:
                 logger.error('Timeout na comunicação com o Gateway')
