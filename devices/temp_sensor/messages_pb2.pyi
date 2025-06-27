@@ -47,16 +47,18 @@ class Address(_message.Message):
     def __init__(self, ip: _Optional[str] = ..., port: _Optional[int] = ...) -> None: ...
 
 class DeviceInfo(_message.Message):
-    __slots__ = ("type", "name", "state", "metadata")
+    __slots__ = ("type", "name", "state", "metadata", "timestamp")
     TYPE_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
     METADATA_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     type: DeviceType
     name: str
     state: str
     metadata: str
-    def __init__(self, type: _Optional[_Union[DeviceType, str]] = ..., name: _Optional[str] = ..., state: _Optional[str] = ..., metadata: _Optional[str] = ...) -> None: ...
+    timestamp: str
+    def __init__(self, type: _Optional[_Union[DeviceType, str]] = ..., name: _Optional[str] = ..., state: _Optional[str] = ..., metadata: _Optional[str] = ..., timestamp: _Optional[str] = ...) -> None: ...
 
 class JoinRequest(_message.Message):
     __slots__ = ("device_info", "device_address")
@@ -93,20 +95,18 @@ class SensorsReport(_message.Message):
     def __init__(self, readings: _Optional[_Iterable[_Union[SensorReading, _Mapping]]] = ...) -> None: ...
 
 class ActuatorUpdate(_message.Message):
-    __slots__ = ("device_name", "action_value", "timestamp", "state", "metadata", "is_online")
+    __slots__ = ("device_name", "state", "metadata", "timestamp", "is_online")
     DEVICE_NAME_FIELD_NUMBER: _ClassVar[int]
-    ACTION_VALUE_FIELD_NUMBER: _ClassVar[int]
-    TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
     METADATA_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     IS_ONLINE_FIELD_NUMBER: _ClassVar[int]
     device_name: str
-    action_value: str
-    timestamp: str
     state: str
     metadata: str
+    timestamp: str
     is_online: bool
-    def __init__(self, device_name: _Optional[str] = ..., action_value: _Optional[str] = ..., timestamp: _Optional[str] = ..., state: _Optional[str] = ..., metadata: _Optional[str] = ..., is_online: bool = ...) -> None: ...
+    def __init__(self, device_name: _Optional[str] = ..., state: _Optional[str] = ..., metadata: _Optional[str] = ..., timestamp: _Optional[str] = ..., is_online: bool = ...) -> None: ...
 
 class ActuatorsReport(_message.Message):
     __slots__ = ("updates",)
