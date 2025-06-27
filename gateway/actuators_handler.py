@@ -5,7 +5,58 @@ import threading
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from google.protobuf import message
-from messages_pb2 import ActuatorUpdate
+from messages_pb2 import ActuatorUpdate, ActuatorComply, ComplyStatus
+
+
+def send_command(args, device_name, command_message_bytes):
+    logger = logging.getLogger(f'SEND_COMMAND_TO_{device_name}')
+    logger.info('Tentando enviar comando para %s', device_name)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        actuator = args.db.get_actuator(device_name)
+        if actuator is None:
+            logger.warning('Actuator %s não está registrado', device_name)
+            return None
+        sock.settimeout(args.actuators_timeout)
+        try:
+            sock.connect(actuator['address'])
+        except OSError as e:
+            logger.error(
+                'Erro ao estabelecer conexão com %s: (%s) %s',
+                device_name, type(e).__name__, e
+            )
+            msg = None
+        try:
+            sock.send(command_message_bytes)
+        except OSError as e:
+            logger.error(
+                'Erro ao enviar comando para %s: (%s) %s',
+                device_name, type(e).__name__, e
+            )
+            msg = None
+        try:
+            msg = sock.recv(1024)
+        except OSError as e:
+            logger.error(
+                'Erro ao receber resposta de %s: (%s) %s',
+                device_name, type(e).__name__, e
+            )
+            msg = None
+        if msg is None:
+            with args.db_actuators_lock:
+                args.db.mark_actuator_as_offline(device_name)
+                args.pending_actuators_updates.set()
+            return None
+        reply = ActuatorComply()
+        reply.ParseFromString(msg)
+        if reply.status is ComplyStatus.OK:
+            name = reply.update.device_name
+            state = json.loads(reply.update.state)
+            metadata = json.loads(reply.update.metadata)
+            timestamp = datetime.fromisoformat(reply.update.timestamp)
+            with args.db_actuators_lock:
+                args.db.add_actuator_update(name, state, metadata, timestamp)
+                args.pending_actuators_updates.set()
+        return reply
 
 
 def actuator_handler(args, sock, addrs):

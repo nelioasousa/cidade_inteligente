@@ -114,6 +114,7 @@ def main():
         args.verbose = True
     args.base_timeout = 2.5
     args.client_timeout = 5.0
+    args.actuators_timeout = 5.0
     args.host_ip = socket.gethostbyname(socket.gethostname())
     args.db = Database(clear=args.clear)
     args.stop_flag = threading.Event()
