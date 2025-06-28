@@ -1,11 +1,12 @@
 import sys
+import time
 import socket
 import threading
 import logging
 from db import Database
 from registration_handler import multicast_location, registration_listener
-from sensors_handler import sensors_listener
-from actuators_handler import actuators_listener
+from sensors_handler import sensors_listener, sensors_report_generator
+from actuators_handler import actuators_listener, actuators_report_generator
 from clients_handler import clients_listener
 
 
@@ -28,11 +29,21 @@ def _run(args):
         multicaster = threading.Thread(
             target=multicast_location, args=(args,)
         )
+        sgenerator = threading.Thread(
+            target=sensors_report_generator, args=(args,)
+        )
+        agenerator = threading.Thread(
+            target=actuators_report_generator, args=(args,)
+        )
         jlistener.start()
         slistener.start()
         alistener.start()
         multicaster.start()
-        clients_listener(args)
+        sgenerator.start()
+        agenerator.start()
+        while True:
+            time.sleep(10.0)
+        # clients_listener(args)
     except BaseException as e:
         args.stop_flag.set()
         if isinstance(e, KeyboardInterrupt):
@@ -44,6 +55,8 @@ def _run(args):
         slistener.join()
         alistener.join()
         multicaster.join()
+        sgenerator.join()
+        agenerator.join()
         args.db.persist()
 
 
@@ -108,19 +121,35 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Logging
     lvl = args.level.strip().upper()
     args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
     if args.level == 'DEBUG':
         args.verbose = True
+
+    # Timeouts
     args.base_timeout = 2.5
     args.client_timeout = 5.0
     args.actuators_timeout = 5.0
+    args.reports_timeout = 10.0
+
+    # Host IP
     args.host_ip = socket.gethostbyname(socket.gethostname())
+
+    # Database and stop event
     args.db = Database(clear=args.clear)
     args.stop_flag = threading.Event()
-    args.pending_actuators_updates = threading.Event()
+
+    # Sensors utilities
     args.db_sensors_lock = threading.Lock()
+    args.db_sensors_report_lock = threading.Lock()
+    args.sensors_gen_interval = 10.0
+
+    # Actuators utilities
+    args.pending_actuators_updates = threading.Event()
     args.db_actuators_lock = threading.Lock()
+    args.db_actuators_report_lock = threading.Lock()
 
     return _run(args)
 

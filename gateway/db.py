@@ -13,51 +13,68 @@ class Database:
             os.remove(self.db_file)
         if os.path.isfile(self.db_file):
             with open(self.db_file, mode='br') as db:
-                self.db = pickle.load(db)
+                self.devices = pickle.load(db)
+            today = datetime.date.today()
+            for name, sensor in self.devices[0].items():
+                if sensor['last_seen'][0] < today:
+                    self.devices[0].pop(name)
+            for name, actuator in self.devices[1].items():
+                if actuator['last_seen'][0] < today:
+                    self.devices[1].pop(name)
+                else:
+                    self.devices[1][name]['is_online'] = False
         else:
-            self.db = ({}, {})
+            self.devices = ({}, {})
+        self.sensors_report = (0, None)
+        self.actuators_report = (0, None)
 
     def register_sensor(self, name, address, metadata):
-        sensor = self.db[0].setdefault(name, {'name': name})
+        sensor = self.devices[0].setdefault(name, {'name': name})
         sensor['address'] = address
         sensor['metadata'] = metadata
         sensor['last_seen'] = (datetime.date.today(), time.monotonic())
         sensor.setdefault('data', SortedList())
 
     def register_actuator(self, name, address, state, metadata, timestamp):
-        actuator = self.db[1].setdefault(name, {'name': name})
+        actuator = self.devices[1].setdefault(name, {'name': name})
         actuator['address'] = address
         actuator['state'] = state
         actuator['metadata'] = metadata
         actuator['timestamp'] = timestamp
-        actuator['online'] = True
+        actuator['is_online'] = True
         actuator['last_seen'] = (datetime.date.today(), time.monotonic())
+
+    def att_sensors_report(self, report):
+        self.sensors_report = (self.sensors_report[0] + 1, report)
+
+    def att_actuators_report(self, report):
+        self.actuators_report = (self.actuators_report[0] + 1, report)
 
     def persist(self):
         with open(self.db_file, mode='bw') as db:
-            pickle.dump(self.db, db)
+            pickle.dump(self.devices, db)
     
     def get_sensor(self, name):
         try:
-            return self.db[0][name]
+            return self.devices[0][name]
         except KeyError:
             return None
     
     def get_actuator(self, name):
         try:
-            return self.db[1][name]
+            return self.devices[1][name]
         except KeyError:
             return None
-    
+
     def get_actuator_by_address(self, address):
-        for actuator in self.db[1].values():
+        for actuator in self.devices[1].values():
             if actuator['address'] == address:
                 return actuator
         return None
 
     def add_sensor_reading(self, name, value, metadata, timestamp):
         try:
-            sensor = self.db[0][name]
+            sensor = self.devices[0][name]
         except KeyError:
             return False
         sensor['data'].add((timestamp, value))
@@ -68,26 +85,26 @@ class Database:
     
     def add_actuator_update(self, name, state, metadata, timestamp):
         try:
-            actuator = self.db[1][name]
+            actuator = self.devices[1][name]
         except KeyError:
             return False
         actuator['state'] = state
         actuator['metadata'] = metadata
         actuator['timestamp'] = timestamp
-        actuator['online'] = True
+        actuator['is_online'] = True
         actuator['last_seen'] = (datetime.date.today(), time.monotonic())
         return True
 
     def mark_actuator_as_offline(self, name):
         try:
-            self.db[1][name]['online'] = False
+            self.devices[1][name]['is_online'] = False
             return True
         except KeyError:
             return False
 
     def get_sensors_summary(self):
         summary = []
-        for sensor, sensor_data in self.db[0].items():
+        for sensor, sensor_data in self.devices[0].items():
             try:
                 timestamp, reading_value = sensor_data['data'][-1]
             except IndexError:
@@ -95,8 +112,11 @@ class Database:
             summary.append({
                 'device_name': sensor,
                 'reading_value': reading_value,
-                'timestamp': timestamp,
                 'metadata': sensor_data['metadata'],
+                'timestamp': timestamp,
                 'last_seen': sensor_data['last_seen'],
             })
         return summary
+    
+    def get_actuators_summary(self):
+        return [actuator for actuator in self.devices[1].values()]

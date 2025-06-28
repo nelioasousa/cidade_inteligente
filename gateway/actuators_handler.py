@@ -1,9 +1,40 @@
 import json
+import time
 import socket
 import logging
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
-from messages_pb2 import ActuatorUpdate, ActuatorComply, ComplyStatus
+from messages_pb2 import ActuatorUpdate, ActuatorsReport
+from messages_pb2 import ActuatorComply, ComplyStatus
+
+
+def actuators_report_generator(args):
+    logger = logging.getLogger('ACTUATORS_REPORT_GENERATOR')
+    logger.info('Iniciando o gerador de relatórios dos atuadores')
+    while not args.stop_flag.is_set():
+        if not args.pending_actuators_updates.is_set():
+            time.sleep(1.0)
+            continue
+        with args.db_actuators_lock:
+            actuators = args.db.get_actuators_summary()
+        actuators = [
+            ActuatorUpdate(
+                device_name=actuator['name'],
+                state=json.dumps(actuator['state']),
+                metadata=json.dumps(actuator['metadata']),
+                timestamp=actuator['timestamp'].isoformat(),
+                is_online=actuator['is_online'],
+            )
+            for actuator in actuators
+        ]
+        if args.verbose:
+            logger.info(
+                'Novo relatório: %d atuadores reportados', len(actuators)
+            )
+        report_msg = ActuatorsReport(devices=actuators).SerializeToString()
+        with args.db_actuators_report_lock:
+            args.db.att_actuators_report(report_msg)
+        args.pending_actuators_updates.clear()
 
 
 def send_command(args, actuator_name, command_message_bytes):
