@@ -26,6 +26,7 @@ class ComplyStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     CS_OK: _ClassVar[ComplyStatus]
     CS_FAIL: _ClassVar[ComplyStatus]
     CS_UNKNOWN_ACTION: _ClassVar[ComplyStatus]
+    CS_INVALID_STATE: _ClassVar[ComplyStatus]
 
 class RequestType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -42,7 +43,7 @@ class ReplyStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     RS_FAIL: _ClassVar[ReplyStatus]
     RS_INVALID_STATE: _ClassVar[ReplyStatus]
     RS_UNKNOWN_DEVICE: _ClassVar[ReplyStatus]
-    RS_UNKNOWN_COMMAND: _ClassVar[ReplyStatus]
+    RS_UNKNOWN_ACTION: _ClassVar[ReplyStatus]
 DT_UNSPECIFIED: DeviceType
 DT_SENSOR: DeviceType
 DT_ACTUATOR: DeviceType
@@ -54,6 +55,7 @@ CS_UNSPECIFIED: ComplyStatus
 CS_OK: ComplyStatus
 CS_FAIL: ComplyStatus
 CS_UNKNOWN_ACTION: ComplyStatus
+CS_INVALID_STATE: ComplyStatus
 RT_UNSPECIFIED: RequestType
 RT_GET_SENSOR_DATA: RequestType
 RT_GET_ACTUATOR_UPDATE: RequestType
@@ -64,7 +66,7 @@ RS_OK: ReplyStatus
 RS_FAIL: ReplyStatus
 RS_INVALID_STATE: ReplyStatus
 RS_UNKNOWN_DEVICE: ReplyStatus
-RS_UNKNOWN_COMMAND: ReplyStatus
+RS_UNKNOWN_ACTION: ReplyStatus
 
 class Address(_message.Message):
     __slots__ = ("ip", "port")
@@ -181,7 +183,7 @@ class SendNextReport(_message.Message):
     __slots__ = ()
     def __init__(self) -> None: ...
 
-class ConnectRequest(_message.Message):
+class ConnectionRequest(_message.Message):
     __slots__ = ("sensors_report_port", "actuators_report_port")
     SENSORS_REPORT_PORT_FIELD_NUMBER: _ClassVar[int]
     ACTUATORS_REPORT_PORT_FIELD_NUMBER: _ClassVar[int]
