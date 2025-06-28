@@ -56,7 +56,7 @@ def sensors_listener(args):
             except TimeoutError:
                 continue
             logger.debug(
-                'Leitura de temperatura recebida: (%s, %s %.2f)',
+                'Leitura de temperatura recebida: (%s, %s, %.2f)',
                 reading.timestamp,
                 reading.device_name,
                 reading.reading_value,

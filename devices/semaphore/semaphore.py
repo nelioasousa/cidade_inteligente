@@ -20,11 +20,12 @@ def gateway_discoverer(args):
         sock.setsockopt(
             socket.IPPROTO_IP,
             socket.IP_ADD_MEMBERSHIP,
-            socket.inet_aton(args.multicast_ip) + socket.inet_aton('0.0.0.0')
+            socket.inet_aton(args.multicast_ip) + socket.inet_aton('0.0.0.0'),
         )
         logger.info(
             'Procurando pelo Gateway no grupo multicast (%s, %s)',
-            args.multicast_ip, args.multicast_port
+            args.multicast_ip,
+            args.multicast_port,
         )
         sock.settimeout(args.multicast_timeout)
         fail_counter = 0
@@ -34,14 +35,15 @@ def gateway_discoverer(args):
             except TimeoutError:
                 if args.gateway_ip is not None:
                     logger.warning(
-                        'Falha de transmissão do Gateway em %s', args.gateway_ip
+                        'Falha de transmissão do Gateway em %s',
+                        args.gateway_ip,
                     )
                     fail_counter += 1
                     if fail_counter >= args.disconnect_after:
                         logger.warning(
                             'Gateway offline: falhou %d transmissões '
                             'em sequência. Desconectando...',
-                            args.disconnect_after
+                            args.disconnect_after,
                         )
                         disconnect_device(args)
                 continue
@@ -74,12 +76,15 @@ def try_to_connect(args, addrs):
         sock.settimeout(args.base_timeout)
         try:
             sock.connect(addrs)
+            with args.state_lock:
+                state = json.dumps(args.state)
+                timestamp = datetime.datetime.now(datetime.UTC).isoformat()
             device_info = DeviceInfo(
                 type=DeviceType.DT_ACTUATOR,
                 name=args.name,
-                state=json.dumps(args.state),
+                state=state,
                 metadata=json.dumps(args.metadata),
-                timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
+                timestamp=timestamp,
             )
             device_address = Address(ip=args.host_ip, port=args.port)
             join_request = JoinRequest(
@@ -92,24 +97,27 @@ def try_to_connect(args, addrs):
         except Exception as e:
             logger.warning(
                 'Erro durante tentativa de conexão com %s: (%s) %s',
-                addrs, type(e).__name__, e
+                addrs,
+                type(e).__name__,
+                e,
             )
             return False
     args.gateway_ip = addrs[0]
     args.transmission_port = join_reply.report_port
     logger.info(
         'Conexão bem-sucedida com o Gateway em (%s, %s)',
-        addrs[0], join_reply.report_port
+        addrs[0],
+        join_reply.report_port,
     )
     return True
 
 
-def get_update_message(args):
+def get_update_message(args, state, timestamp):
     return ActuatorUpdate(
         device_name=args.name,
-        state=json.dumps(args.state),
+        state=state,
         metadata=json.dumps(args.metadata),
-        timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
+        timestamp=timestamp,
     )
 
 
@@ -117,49 +125,56 @@ def process_set_state_command(args, state_string):
     new_state = json.loads(state_string)
     unknown_states = set(new_state) - set(args.state)
     if unknown_states:
-        return False
+        return None
     if 'Phase' in new_state:
-        return False
+        return None
     for period in ('GreenPeriod', 'YellowPeriod', 'RedPeriod'):
         try:
             period = new_state[period]
         except KeyError:
             continue
         if not isinstance(period, float):
-            return False
+            return None
         # Período mínimo de 5 segundos
         if period < 5.0:
-            return False
-    args.state.update(new_state)
-    args.state_change.set()
-    return True, 'OK'
+            return None
+    with args.state_lock:
+        args.state.update(new_state)
+        args.state_change.set()
+        state = json.dumps(args.state)
+        timestamp = datetime.datetime.now(datetime.UTC).isoformat()
+    return get_update_message(args, state, timestamp)
 
 
 def process_command(args, command, logger):
     match command.type:
         case CommandType.CT_ACTION:
-            logger.info('Semáforo recebeu uma requisição do tipo CT_ACTION')
+            logger.debug('Semáforo recebeu uma requisição do tipo CT_ACTION')
+            with args.state_lock:
+                state = json.dumps(args.state)
+                timestamp = datetime.datetime.now(datetime.UTC).isoformat()
             comply = ActuatorComply(
                 status=ComplyStatus.CS_UNKNOWN_ACTION,
-                update=get_update_message(args),
+                update=get_update_message(args, state, timestamp),
             )
         case CommandType.CT_GET_STATE:
-            logger.info('Semáforo recebeu uma requisição do tipo CT_GET_STATE')
+            logger.debug('Semáforo recebeu uma requisição do tipo CT_GET_STATE')
+            with args.state_lock:
+                state = json.dumps(args.state)
+                timestamp = datetime.datetime.now(datetime.UTC).isoformat()
             comply = ActuatorComply(
                 status=ComplyStatus.CS_OK,
-                update=get_update_message(args),
+                update=get_update_message(args, state, timestamp),
             )
         case CommandType.CT_SET_STATE:
             result = process_set_state_command(args, command.body)
-            if result:
-                logger.info('Requisição CT_SET_STATE respondida com sucesso')
-                status = ComplyStatus.CS_OK
-            else:
-                logger.info('Requisição CT_SET_STATE gerou CS_INVALID_STATE')
+            if result is None:
+                logger.debug('Requisição CT_SET_STATE gerou CS_INVALID_STATE')
                 status = ComplyStatus.CS_INVALID_STATE
-            comply = ActuatorComply(
-                status=status, update=get_update_message(args)
-            )
+            else:
+                logger.debug('Requisição CT_SET_STATE respondida com sucesso')
+                status = ComplyStatus.CS_OK
+            comply = ActuatorComply(status=status, update=result)
     return comply.SerializeToString()
 
 
@@ -172,7 +187,8 @@ def command_listener(args):
             sock.listen()
             logger.info(
                 'Escutando por comandos do Gateway em (%s, %s)',
-                args.host_ip, args.clients_port
+                args.host_ip,
+                args.port,
             )
         except Exception as e:
             logger.error(
@@ -181,7 +197,7 @@ def command_listener(args):
                 args.host_ip,
                 args.port,
                 type(e).__name__,
-                e
+                e,
             )
         sock.settimeout(args.base_timeout)
         while not args.stop_flag.is_set():
@@ -260,10 +276,15 @@ def state_change_reporter(args):
                         e,
                     )
                 continue
-            try:
-                sock.send(get_update_message(args).SerializeToString())
+            with args.state_lock:
+                state = json.dumps(args.state)
                 args.state_change.clear()
+                timestamp = datetime.datetime.now(datetime.UTC).isoformat()
+            update = get_update_message(args, state, timestamp)
+            try:
+                sock.send(update.SerializeToString())
             except Exception as e:
+                args.state_change.set()
                 if args.gateway_ip is not None:
                     logger.error(
                         'Erro ao enviar atualização para (%s, %s): (%s, %s)',
@@ -272,18 +293,28 @@ def state_change_reporter(args):
                         type(e).__name__,
                         e,
                     )
+                continue
             finally:
                 sock.shutdown(socket.SHUT_RDWR)
 
 
 def phase_generator(args):
     while True:
-        args.state_change.set()
-        yield 'Red', args.state['RedPeriod']
-        args.state_change.set()
-        yield 'Green', args.state['GreenPeriod']
-        args.state_change.set()
-        yield 'Yellow', args.state['YellowPeriod']
+        with args.state_lock:
+            args.state['Phase'] = 'Red'
+            args.state_change.set()
+            phase_period = args.state['RedPeriod']
+        yield 'Red', phase_period
+        with args.state_lock:
+            args.state['Phase'] = 'Green'
+            args.state_change.set()
+            phase_period = args.state['GreenPeriod']
+        yield 'Green', phase_period
+        with args.state_lock:
+            args.state['Phase'] = 'Yellow'
+            args.state_change.set()
+            phase_period = args.state['YellowPeriod']
+        yield 'Yellow', phase_period
 
 
 def simulator(args):
@@ -397,9 +428,10 @@ def main():
         'Phases': ('Unset', 'Green', 'Yellow', 'Red'),
     }
 
-    # Events
+    # Events and locks
     args.stop_flag = threading.Event()
     args.state_change = threading.Event()
+    args.state_lock = threading.Lock()
 
     return _run(args)
 
