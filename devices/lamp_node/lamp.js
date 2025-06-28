@@ -1,5 +1,5 @@
-const CONTROLLER_MULTICAST = require('./controllerGatewayTCP');
-const CONTROLLER_GATEWAY = require('./controllerMulticastUDP');
+const CONTROLLER_MULTICAST = require('./controllerMulticastUDP');
+const CONTROLLER_GATEWAY = require('./controllerGatewayTCP');
 
 
 /**

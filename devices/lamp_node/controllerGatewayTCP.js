@@ -6,13 +6,13 @@ const { ActuatorUpdate, JoinRequest, JoinReply, DeviceType, DeviceInfo, Address 
  * Informaçoes do Cliente <> Gateway
  */
 
-const IS_ONLINE = false;
+let IS_ONLINE = false;
 
 /**
  * Informaçoes do atuador
  */
 const DEVICE_NAME = "LAMP";
-const LAMP_STATE = '{"isOn": "sim", "Color": "yellow", "Brightness": 10}';
+let LAMP_STATE = '{"isOn": "sim", "Color": "yellow", "Brightness": 10}';
 const LAMP_METADATA = '{"isOn": "(sim ou nao)", "Color": "(yellow ou branco)", "Brightness": "(Entre 1 a 10)"}';
 const PORT_ATUADOR = 60555;
 const HOST_ATUADOR = '127.0.0.1';
@@ -20,8 +20,8 @@ const HOST_ATUADOR = '127.0.0.1';
 /**
  * Variavel servidor TCP
  */
-const server = null;
-const connectionGateway = null;
+let server = null;
+let connectionGateway = null;
 
 function connectToGateway(ipGateway, portGateway) {
 

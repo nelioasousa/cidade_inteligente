@@ -12,7 +12,7 @@ const MULTICAST_ADDRESS = '224.0.1.0';
 /**
  * Cria um socket UDP IPv4
  */
-const socket = null;
+let socket = null;
 
 /**
  * Variáveis de controle
