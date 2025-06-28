@@ -112,11 +112,11 @@ class SensorReading(_message.Message):
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     IS_ONLINE_FIELD_NUMBER: _ClassVar[int]
     device_name: str
-    reading_value: str
+    reading_value: float
     metadata: str
     timestamp: str
     is_online: bool
-    def __init__(self, device_name: _Optional[str] = ..., reading_value: _Optional[str] = ..., metadata: _Optional[str] = ..., timestamp: _Optional[str] = ..., is_online: bool = ...) -> None: ...
+    def __init__(self, device_name: _Optional[str] = ..., reading_value: _Optional[float] = ..., metadata: _Optional[str] = ..., timestamp: _Optional[str] = ..., is_online: bool = ...) -> None: ...
 
 class ActuatorUpdate(_message.Message):
     __slots__ = ("device_name", "state", "metadata", "timestamp", "is_online")
@@ -155,8 +155,8 @@ class SensorData(_message.Message):
         TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
         READING_VALUE_FIELD_NUMBER: _ClassVar[int]
         timestamp: str
-        reading_value: str
-        def __init__(self, timestamp: _Optional[str] = ..., reading_value: _Optional[str] = ...) -> None: ...
+        reading_value: float
+        def __init__(self, timestamp: _Optional[str] = ..., reading_value: _Optional[float] = ...) -> None: ...
     DEVICE_NAME_FIELD_NUMBER: _ClassVar[int]
     METADATA_FIELD_NUMBER: _ClassVar[int]
     READINGS_FIELD_NUMBER: _ClassVar[int]
