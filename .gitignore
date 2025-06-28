@@ -11,3 +11,4 @@ db.pickle
 # Node
 devices/lamp_node/package-lock.json
 devices/lamp_node/node_modules/
+.venv/

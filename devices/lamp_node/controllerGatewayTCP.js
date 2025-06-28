@@ -14,7 +14,7 @@ let IS_ONLINE = false;
 const DEVICE_NAME = "LAMP";
 let LAMP_STATE = '{"isOn": "sim", "Color": "yellow", "Brightness": 10}';
 const LAMP_METADATA = '{"isOn": "(sim ou nao)", "Color": "(yellow ou branco)", "Brightness": "(Entre 1 a 10)"}';
-const PORT_ATUADOR = 60555;
+const PORT_ATUADOR = 60222;
 const HOST_ATUADOR = '127.0.0.1';
 
 /**
@@ -37,13 +37,13 @@ function connectToGateway(ipGateway, portGateway) {
 
     // JoinRequest para o Gateway
     const dataRegisterActuator = new DeviceInfo();
-    dataRegisterActuator.setDeviceType(DeviceType.DT_ACTUATOR);
+    dataRegisterActuator.setType(DeviceType.DT_ACTUATOR);
     dataRegisterActuator.setName(DEVICE_NAME);
     dataRegisterActuator.setState(LAMP_STATE.STATE);
     dataRegisterActuator.setMetadata(LAMP_METADATA);
     dataRegisterActuator.setTimestamp(new Date(Date.now()).toString());
 
-    const address = new Address();
+    const address = new Address(); // porta do atuador 
     address.setIp(HOST_ATUADOR);
     address.setPort(PORT_ATUADOR);
 
@@ -57,7 +57,7 @@ function connectToGateway(ipGateway, portGateway) {
     // JoinReplay do Gateway
     connectionGateway.on('data', (data) => {
         const joinReplay = JoinReply.deserializeBinary(data);
-        portGatewayToConnect = joinReplay.report_port;
+        portGatewayToConnect = joinReplay.report_port; // porta do gateway que o atuador deve usar
     });
 
     connectionGateway.end();
@@ -72,6 +72,7 @@ function connectToGateway(ipGateway, portGateway) {
 
     // Recebendo comandos do Gateway
     connectionGateway.on('data', (data) => {
+
         const actuatorUpdate = ActuatorUpdate.deserializeBinary(data);
 
         LAMP_STATE.STATE = actuatorUpdate.state;
@@ -104,8 +105,8 @@ function startServer() {
             
             const actuatorUpdate = ActuatorUpdate.deserializeBinary(data);
 
-            LAMP_STATE.STATE = actuatorUpdate.state;
-            IS_ONLINE = actuatorUpdate.is_online;
+            LAMP_STATE.STATE = actuatorUpdate.getState();
+            IS_ONLINE = actuatorUpdate.getIsOnline();
             
             //colocar dentro do cliente <> gateway
             const dataResp = new ActuatorUpdate();
@@ -135,7 +136,7 @@ function startServer() {
 
     // Inicia o servidor
     server.listen(PORT_ATUADOR, HOST_ATUADOR, () => {
-        console.log(`Atuador rodando em ${HOST}:${PORT}`);
+        console.log(`Atuador rodando em ${HOST_ATUADOR}:${PORT_ATUADOR}`);
     });
 
     // Tratamento de erros gerais do servidor
