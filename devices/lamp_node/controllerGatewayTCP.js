@@ -92,6 +92,10 @@ function connectToGateway(ipGateway, portGateway) {
 
     });
 
+    startServer();
+}
+
+function startServer() {
     // Cria o servidor TCP
     server = net.createServer((socket) => {
 
