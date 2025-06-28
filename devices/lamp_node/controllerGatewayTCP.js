@@ -51,12 +51,12 @@ function connectToGateway(ipGateway, portGateway) {
     joinRequest.setDeviceInfo(dataRegisterActuator);
     joinRequest.setDeviceAddress(address);
 
-    const msgSend = JoinRequest.encode(joinRequest).finish();
+    const msgSend = joinRequest.serializeBinary();
     connectionGateway.write(msgSend); 
 
     // JoinReplay do Gateway
     connectionGateway.on('data', (data) => {
-        const joinReplay = JoinReply.decode(data);
+        const joinReplay = JoinReply.deserializeBinary(data);
         portGatewayToConnect = joinReplay.report_port;
     });
 
@@ -72,7 +72,7 @@ function connectToGateway(ipGateway, portGateway) {
 
     // Recebendo comandos do Gateway
     connectionGateway.on('data', (data) => {
-        const actuatorUpdate = ActuatorUpdate.decode(data);
+        const actuatorUpdate = ActuatorUpdate.deserializeBinary(data);
 
         LAMP_STATE.STATE = actuatorUpdate.state;
         IS_ONLINE = actuatorUpdate.is_online;
@@ -85,7 +85,7 @@ function connectToGateway(ipGateway, portGateway) {
         dataResp.setTimestamp(new Date(Date.now()).toString());
         dataResp.setIsOnline(IS_ONLINE);
 
-        const msgResponse = ActuatorUpdate.encode(dataResp).finish();
+        const msgResponse = dataResp.serializeBinary();
 
         // Envia a mensagem para gateway
         connectionGateway.write(msgResponse);
@@ -102,7 +102,7 @@ function startServer() {
         // Receber comandos
         socket.on('data', (data) => {
             
-            const actuatorUpdate = ActuatorUpdate.decode(data);
+            const actuatorUpdate = ActuatorUpdate.deserializeBinary(data);
 
             LAMP_STATE.STATE = actuatorUpdate.state;
             IS_ONLINE = actuatorUpdate.is_online;
@@ -115,7 +115,7 @@ function startServer() {
             dataResp.setTimestamp(new Date(Date.now()).toString());
             dataResp.setIsOnline(IS_ONLINE);
 
-            const msgResponse = ActuatorUpdate.encode(dataResp).finish();
+            const msgResponse = dataResp.serializeBinary();
   
             // Envia a mensagem para gateway
             connectionGateway.write(msgResponse);

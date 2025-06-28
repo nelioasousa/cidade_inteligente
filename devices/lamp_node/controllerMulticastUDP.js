@@ -43,8 +43,9 @@ function connectToMulticast() {
     // Manipulador de mensagens recebidas
     socket.on('message', (msg, rinfo) => {
       console.log(`Mensagem recebida de ${rinfo.address}:${rinfo.port}:`);
-
-      const message = Address.decode(msg);
+      console.log(`MSG: ${msg}`);
+      
+      const message = Address.deserializeBinary(msg);
       const ipGateway = message.port;
       const portGateway = message.ip;
 
