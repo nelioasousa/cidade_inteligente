@@ -10,11 +10,6 @@ const PORT = 12345;
 const MULTICAST_ADDRESS = '224.0.1.0';
 
 /**
- * Informaçoes do atuador
- */
-const IS_CONNECT = false;
-
-/**
  * Cria um socket UDP IPv4
  */
 const socket = null;
@@ -42,7 +37,6 @@ function connectToMulticast() {
     // Configura o socket para receber mensagens multicast
     socket.on('listening', () => {
       socket.addMembership(MULTICAST_ADDRESS); // Inscreve-se no grupo multicast
-      IS_CONNECT = true;
       reconnectAttempts = 0; // Resetar tentativas após conexão bem-sucedida
     });
 
@@ -62,7 +56,6 @@ function connectToMulticast() {
     // Manipulador de erros
     socket.on('error', (err) => {
       console.error('Erro no socket:', err.message);
-      IS_CONNECT = false;
       CONTROLLER_GATEWAY.closeServer();
       handleReconnection();
     });
@@ -71,7 +64,6 @@ function connectToMulticast() {
 
   } catch (err) {
     console.error('Erro ao configurar conexão multicast:', err.message);
-    IS_CONNECT = false;
     CONTROLLER_GATEWAY.closeServer();
     handleReconnection();
   }
@@ -104,10 +96,16 @@ function handleReconnection() {
   }, delay);
 }
 
+function closeConnectionAtuador() {
+    if(socket != null) {
+        socket.close();
+    }
+}
 
 module.exports = {
   socket,
   createSocketMulticast,
   connectToMulticast,
+  closeConnectionAtuador
 };
 
