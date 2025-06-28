@@ -359,11 +359,6 @@ def main():
     )
 
     parser.add_argument(
-        '-v', '--verbose', action='store_true',
-        help='Torna o Gateway verboso ao logar informações.'
-    )
-
-    parser.add_argument(
         '-l', '--level', type=str, default='INFO',
         help='Nível do logging. Valores permitidos são "DEBUG", "INFO", "WARN", "ERROR".'
     )
@@ -373,8 +368,6 @@ def main():
     # Logging
     lvl = args.level.strip().upper()
     args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
-    if args.level == 'DEBUG':
-        args.verbose = True
     
     # Identifier
     args.name = f'Semaphore-{args.name}'
@@ -404,7 +397,7 @@ def main():
         'Phases': ('Unset', 'Green', 'Yellow', 'Red'),
     }
 
-    # Stop flag
+    # Events
     args.stop_flag = threading.Event()
     args.state_change = threading.Event()
 

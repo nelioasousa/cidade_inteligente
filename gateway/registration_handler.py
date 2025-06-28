@@ -2,7 +2,6 @@ import time
 import json
 import socket
 import logging
-import threading
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import Address, JoinRequest, JoinReply, DeviceType
@@ -11,60 +10,71 @@ from messages_pb2 import Address, JoinRequest, JoinReply, DeviceType
 def multicast_location(args):
     logger = logging.getLogger('MULTICASTER')
     logger.info(
-        'Multicasting endereço de registro de dispositivos: (%s, %s)',
-        args.host_ip, args.registration_port
+        'Enviando endereço de registro para grupo multicast (%s, %s)',
+        args.multicast_ip, args.multicast_port
     )
     addrs = Address(ip=args.host_ip, port=args.registration_port)
     addrs = addrs.SerializeToString()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
-        try:
-            while not args.stop_flag.is_set():
+        while not args.stop_flag.is_set():
+            try:
                 sock.sendto(addrs, (args.multicast_ip, args.multicast_port))
-                time.sleep(args.multicast_interval)
-        except Exception as e:
-            logger.error('Erro durante multicast: (%s) %s', type(e).__name__, e)
+            except Exception as e:
+                logger.error(
+                    'Erro ao enviar mensagem para o grupo multicast: (%s) %s',
+                    type(e).__name__,
+                    e,
+                )
+            time.sleep(args.multicast_interval)
 
 
 def registration_handler(args, sock, addrs):
-    logger = logging.getLogger(f'REGISTRATION_HANDLER_{threading.get_ident()}')
+    logger = logging.getLogger(f'REGISTRATION_HANDLER_{addrs}')
     logger.info(
-        'Processando requisição de ingresso de %s', addrs
+        'Processando requisição de ingresso de um dispositivo em %s', addrs
     )
     try:
         sock.settimeout(args.base_timeout)
         req = JoinRequest()
         req.ParseFromString(sock.recv(1024))
-        if req.device_info.type is DeviceType.DT_SENSOR:
-            report_port = args.sensors_port
-            with args.db_sensors_lock:
-                args.db.register_sensor(
-                    name=req.device_info.name,
-                    address=(req.device_address.ip, req.device_address.port),
-                    metadata=json.loads(req.device_info.metadata),
-                )
-        elif req.device_info.type is DeviceType.DT_ACTUATOR:
-            report_port = args.actuators_port
-            with args.db_actuators_lock:
-                args.db.register_actuator(
-                    name=req.device_info.name,
-                    address=(req.device_address.ip, req.device_address.port),
-                    state=json.loads(req.device_info.state),
-                    metadata=json.loads(req.device_info.metadata),
-                    timestamp=datetime.fromisoformat(req.device_info.timestamp),
-                )
-        else:
-            raise RuntimeError('Invalid device type')
+        device_info = req.device_info
+        device_addrs = req.device_address
+        match req.device_info.type:
+            case DeviceType.DT_SENSOR:
+                report_port = args.sensors_port
+                with args.db_sensors_lock:
+                    args.db.register_sensor(
+                        name=device_info.name,
+                        address=(device_addrs.ip, device_addrs.port),
+                        metadata=json.loads(device_info.metadata),
+                    )
+            case DeviceType.DT_ACTUATOR:
+                report_port = args.actuators_port
+                with args.db_actuators_lock:
+                    args.db.register_actuator(
+                        name=device_info.name,
+                        address=(device_addrs.ip, device_addrs.port),
+                        state=json.loads(device_info.state),
+                        metadata=json.loads(device_info.metadata),
+                        timestamp=datetime.fromisoformat(device_info.timestamp),
+                    )
+            case _:
+                raise RuntimeError('Invalid device type')
         reply = JoinReply(report_port=report_port)
         sock.send(reply.SerializeToString())
         logger.info(
             'Ingresso bem-sucedido do dispositivo %s em %s',
-            req.device_info.name, addrs
+            device_info.name,
+            addrs,
         )
     except Exception as e:
         logger.error(
-            'Erro no processamento da requisição de %s: (%s) %s',
-            addrs, type(e).__name__, e
+            'Erro durante registro do dispositivo %s em %s: (%s) %s',
+            device_info.name,
+            addrs,
+            type(e).__name__,
+            e,
         )
     finally:
         sock.shutdown(socket.SHUT_RDWR)
@@ -78,8 +88,9 @@ def registration_listener(args):
         sock.bind(('', args.registration_port))
         sock.listen()
         logger.info(
-            'Escutando requisições de registro em (%s, %s)',
-            args.host_ip, args.registration_port
+            'Escutando por requisições de registro em (%s, %s)',
+            args.host_ip,
+            args.registration_port,
         )
         sock.settimeout(args.base_timeout)
         with ThreadPoolExecutor(max_workers=10) as executor:

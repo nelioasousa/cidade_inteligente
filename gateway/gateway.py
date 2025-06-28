@@ -99,16 +99,6 @@ def main():
     )
 
     parser.add_argument(
-        '--sensors_tolerance', type=float, default=10.0,
-        help='Quantos segundos sem receber dados de um sensor para considerá-lo offline.'
-    )
-
-    parser.add_argument(
-        '-v', '--verbose', action='store_true',
-        help='Torna o Gateway verboso ao logar informações.'
-    )
-
-    parser.add_argument(
         '-l', '--level', type=str, default='INFO',
         help='Nível do logging. Valores permitidos são "DEBUG", "INFO", "WARN" e "ERROR".'
     )
@@ -123,8 +113,6 @@ def main():
     # Logging
     lvl = args.level.strip().upper()
     args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
-    if args.level == 'DEBUG':
-        args.verbose = True
 
     # Timeouts
     args.base_timeout = 2.5
@@ -140,6 +128,7 @@ def main():
     args.stop_flag = threading.Event()
 
     # Sensors utilities
+    args.sensors_tolerance = 10.0
     args.db_sensors_lock = threading.Lock()
     args.db_sensors_report_lock = threading.Lock()
     args.sensors_gen_interval = 10.0

@@ -112,13 +112,12 @@ def transmit_readings(args):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         while not args.stop_flag.is_set():
             if args.gateway_ip is None:
-                if args.verbose:
-                    logger.info('Transmissão interrompida. Sem conexão com o Gateway')
+                logger.info('Transmissão interrompida. Sem conexão com o Gateway')
                 time.sleep(5.0)
             else:
                 reading = SensorReading(
                     device_name=args.name,
-                    reading_value=str(get_reading(args)),
+                    reading_value=get_reading(args),
                     timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
                     metadata=json.dumps(args.metadata),
                 )
@@ -126,11 +125,11 @@ def transmit_readings(args):
                     reading.SerializeToString(),
                     (args.gateway_ip, args.transmission_port),
                 )
-                if args.verbose:
-                    logger.info(
-                        'Leitura de temperatura enviada para (%s, %s)',
-                        args.gateway_ip, args.transmission_port
-                    )
+                logger.debug(
+                    'Leitura de temperatura enviada para (%s, %s)',
+                    args.gateway_ip,
+                    args.transmission_port,
+                )
                 time.sleep(args.report_interval)
 
 
@@ -200,31 +199,38 @@ def main():
     )
 
     parser.add_argument(
-        '-v', '--verbose', action='store_true',
-        help='Torna o Gateway verboso ao logar informações.'
-    )
-
-    parser.add_argument(
         '-l', '--level', type=str, default='INFO',
         help='Nível do logging. Valores permitidos são "DEBUG", "INFO", "WARN", "ERROR".'
     )
 
     args = parser.parse_args()
+
+    # Logging
     lvl = args.level.strip().upper()
     args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
-    if args.level == 'DEBUG':
-        args.verbose = True
+
+    # Identifier
     args.name = f'Temperature-{args.name}'
+
+    # Timeouts
     args.base_timeout = 2.5
     args.multicast_timeout = 5.0
+
+    # Host IP
     args.host_ip = socket.gethostbyname(socket.gethostname())
+
+    # Gateway
     args.gateway_ip = None
     args.transmission_port = None
+
+    # Metadata
     args.metadata = {
         'UnitName': 'Celsius',
         'UnitSymbol': '°C',
         'Location': {'Latitude': -3.733486, 'Longitude': -38.570860},
     }
+
+    # Events
     args.stop_flag = threading.Event()
 
     return _run(args)

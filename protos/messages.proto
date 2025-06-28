@@ -36,7 +36,7 @@ message JoinReply {
 // Sensors-Gateway messages
 message SensorReading {
   string device_name = 1;
-  string reading_value = 2;
+  float reading_value = 2;
   string metadata = 3;
   string timestamp = 4;
   bool is_online = 5;
@@ -86,7 +86,7 @@ message SensorData {
 
   message SimpleReading {
     string timestamp = 1;
-    string reading_value = 2;
+    float reading_value = 2;
   }
 
   string device_name = 1;

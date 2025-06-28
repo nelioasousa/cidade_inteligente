@@ -54,18 +54,24 @@ class Database:
     def persist(self):
         with open(self.db_file, mode='bw') as db:
             pickle.dump(self.devices, db)
-    
+
     def get_sensor(self, name):
         try:
             return deepcopy(self.devices[0][name])
         except KeyError:
             return None
-    
+
     def get_actuator(self, name):
         try:
             return deepcopy(self.devices[1][name])
         except KeyError:
             return None
+
+    def is_sensor_registered(self, name):
+        return name in self.devices[0]
+
+    def is_actuator_registered(self, name):
+        return name in self.devices[1]
 
     def get_actuator_name_by_address(self, address):
         for actuator in self.devices[1].values():

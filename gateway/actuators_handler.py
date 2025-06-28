@@ -29,10 +29,9 @@ def actuators_report_generator(args):
             )
             for actuator in actuators
         ]
-        if args.verbose:
-            logger.info(
-                'Novo relatório: %d atuadores reportados', len(actuators)
-            )
+        logger.debug(
+            'Novo relatório gerado: %d atuadores reportados', len(actuators),
+        )
         report_msg = ActuatorsReport(devices=actuators).SerializeToString()
         with args.db_actuators_report_lock:
             args.db.att_actuators_report(report_msg)
@@ -59,7 +58,7 @@ def send_command_to_actuator(
     logger = logging.getLogger(
         f'SEND_COMMAND_TO_{actuator_name}_FROM_{from_address}'
     )
-    logger.info(
+    logger.debug(
         'Tentando enviar comando de %s para atuador %s',
         from_address,
         actuator_name,
@@ -67,7 +66,7 @@ def send_command_to_actuator(
     command = build_command_message(command_type, command_body)
     if command is None:
         logger.warning(
-            'Comando fornecido (`command_type=%d`) é inválido', command_type
+            'Comando fornecido (`command_type=%d`) é inválido', command_type,
         )
         return None
     actuator = args.db.get_actuator(actuator_name)
@@ -129,15 +128,14 @@ def actuator_handler(args, sock, addrs):
     logger = logging.getLogger(f'ACTUATOR_HANDLER_{addrs}')
     logger.info('Gerenciando conexão com o atuador em %s', addrs)
     try:
-        msg = sock.recv(1024)
         update = ActuatorUpdate()
-        update.ParseFromString(msg)
+        update.ParseFromString(sock.recv(1024))
     except Exception as e:
         with args.db_actuators_lock:
             actuator = args.db.get_actuator_name_by_address(addrs)
         if actuator is None:
-            logger.info(
-                'Não há nenhum atuador registrado com o endereço %s', addrs
+            logger.warning(
+                'Não há nenhum atuador registrado com o endereço %s', addrs,
             )
         else:
             with args.db_actuators_lock:
@@ -145,28 +143,32 @@ def actuator_handler(args, sock, addrs):
                 args.pending_actuators_updates.set()
         logger.error(
             'Erro ao receber atualizações do atuador em %s: (%s) %s',
-            addrs, type(e).__name__, e
+            addrs,
+            type(e).__name__,
+            e,
         )
         raise e
     finally:
         sock.shutdown(socket.SHUT_RDWR)
         sock.close()
-    name = update.device_name
+    logger.debug(
+        'Atualização de atuador recebida: (%s, %s)',
+        update.timestamp,
+        update.device_name,
+    )
     state = json.loads(update.state)
     metadata = json.loads(update.metadata)
     timestamp = datetime.fromisoformat(update.timestamp)
-    if args.verbose:
-        logger.info(
-            'Atualização de lâmpada recebida: (%s, %s, %s)',
-            name, update.timestamp, 'ON' if state['isOn'] else 'OFF'
-        )
     with args.db_actuators_lock:
-        result = args.db.add_actuator_update(name, state, metadata, timestamp)
+        result = args.db.add_actuator_update(
+            update.device_name, state, metadata, timestamp,
+        )
         if result:
             args.pending_actuators_updates.set()
-    if args.verbose and not result:
-        logger.info(
-            'Recebendo atualizações de um atuador desconhecido: %s', name
+    if not result:
+        logger.debug(
+            'Recebendo atualizações de um atuador desconhecido: %s',
+            update.device_name,
         )
 
 
@@ -177,7 +179,8 @@ def actuators_listener(args):
         sock.listen()
         logger.info(
             'Escutando por atualizações dos atuadores em (%s, %s)',
-            args.host_ip, args.actuators_port
+            args.host_ip,
+            args.actuators_port,
         )
         sock.settimeout(args.base_timeout)
         with ThreadPoolExecutor(max_workers=10) as executor:
@@ -189,7 +192,8 @@ def actuators_listener(args):
                 except Exception as e:
                     logger.error(
                         'Erro ao tentar conexão com um atuador: (%s) %s',
-                        type(e).__name__, e
+                        type(e).__name__,
+                        e,
                     )
                     continue
                 executor.submit(actuator_handler, args, conn, addrs)

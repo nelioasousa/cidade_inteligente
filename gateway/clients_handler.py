@@ -17,7 +17,7 @@ from messages_pb2 import ActuatorUpdate, CommandType, ComplyStatus
 def transmit_sensors_reports(args, address, stop_transmission_flag):
     logger = logging.getLogger(f'TRANSMIT_SENSORS_REPORTS_{address}')
     logger.info(
-        'Preparando envio de relatórios para o cliente em %s', address
+        'Preparando envio de relatórios para o cliente em %s', address,
     )
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
@@ -45,7 +45,7 @@ def transmit_sensors_reports(args, address, stop_transmission_flag):
             except Exception as e:
                 stop_transmission_flag.set()
                 logger.error(
-                    'Erro ao tentar enviar relatório #%d', report_number
+                    'Erro ao tentar enviar relatório #%d', report_number,
                 )
                 raise e
             fail_count = 0
@@ -73,7 +73,7 @@ def transmit_sensors_reports(args, address, stop_transmission_flag):
 def transmit_actuators_reports(args, address, stop_transmission_flag):
     logger = logging.getLogger(f'TRANSMIT_ACTUATORS_REPORTS_{address}')
     logger.info(
-        'Preparando envio de relatórios para o cliente em %s', address
+        'Preparando envio de relatórios para o cliente em %s', address,
     )
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
@@ -101,7 +101,7 @@ def transmit_actuators_reports(args, address, stop_transmission_flag):
             except Exception as e:
                 stop_transmission_flag.set()
                 logger.error(
-                    'Erro ao tentar enviar relatório #%d', report_number
+                    'Erro ao tentar enviar relatório #%d', report_number,
                 )
                 raise e
             fail_count = 0
@@ -131,7 +131,7 @@ def init_transmissions(
     client_ip,
     sensors_port,
     actuators_port,
-    stop_transmission_flag
+    stop_transmission_flag,
 ):
     sensors_thread = threading.Thread(
         target=transmit_sensors_reports,
@@ -160,7 +160,7 @@ def process_client_request(args, request, from_address, logger):
             readings = [
                 SensorData.SimpleReading(
                     timestamp=timestamp.isoformat(),
-                    reading_value=str(reading),
+                    reading_value=reading,
                 )
                 for timestamp, reading in sensor['data']
             ]
@@ -202,8 +202,7 @@ def process_client_request(args, request, from_address, logger):
                 data=update.SerializeToString(),
             )
         case RequestType.RT_SET_ACTUATOR_STATE:
-            actuator = args.db.get_actuator(request.device_name)
-            if actuator is None:
+            if not args.db.is_actuator_registered():
                 return ClientReply(
                     status=ReplyStatus.RS_UNKNOWN_DEVICE,
                     reply_to=request.type,
@@ -220,11 +219,11 @@ def process_client_request(args, request, from_address, logger):
                 or actuator_comply.status is ComplyStatus.CS_FAIL
             ):
                 return ClientReply(
-                    status=ReplyStatus.RS_FAIL, reply_to=request.type
+                    status=ReplyStatus.RS_FAIL, reply_to=request.type,
                 )
             if actuator_comply.status is ComplyStatus.CS_INVALID_STATE:
                 return ClientReply(
-                    status=ReplyStatus.RS_INVALID_STATE, reply_to=request.type
+                    status=ReplyStatus.RS_INVALID_STATE, reply_to=request.type,
                 )
             return ClientReply(
                 status=ReplyStatus.RS_OK,
@@ -232,8 +231,7 @@ def process_client_request(args, request, from_address, logger):
                 data=actuator_comply.update.SerializeToString(),
             )
         case RequestType.RT_RUN_ACTUATOR_ACTION:
-            actuator = args.db.get_actuator(request.device_name)
-            if actuator is None:
+            if not args.db.is_actuator_registered():
                 return ClientReply(
                     status=ReplyStatus.RS_UNKNOWN_DEVICE,
                     reply_to=request.type,
@@ -250,7 +248,7 @@ def process_client_request(args, request, from_address, logger):
                 or actuator_comply.status is ComplyStatus.CS_FAIL
             ):
                 return ClientReply(
-                    status=ReplyStatus.RS_FAIL, reply_to=request.type
+                    status=ReplyStatus.RS_FAIL, reply_to=request.type,
                 )
             if actuator_comply.status is ComplyStatus.CS_UNKNOWN_ACTION:
                 return ClientReply(
@@ -337,7 +335,8 @@ def clients_listener(args):
         sock.listen()
         logger.info(
             'Escutando pedidos de conexão dos clientes em (%s, %s)',
-            args.host_ip, args.clients_port
+            args.host_ip,
+            args.clients_port,
         )
         sock.settimeout(args.base_timeout)
         with ThreadPoolExecutor(max_workers=10) as executor:
@@ -349,7 +348,8 @@ def clients_listener(args):
                 except Exception as e:
                     logger.error(
                         'Erro ao tentar conexão com um novo cliente: (%s) %s',
-                        type(e).__name__, e
+                        type(e).__name__,
+                        e,
                     )
                     continue
                 executor.submit(client_handler, args, conn, addrs)
