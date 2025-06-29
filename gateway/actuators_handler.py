@@ -2,6 +2,7 @@ import json
 import time
 import socket
 import logging
+import threading
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import ActuatorUpdate, ActuatorsReport
@@ -87,35 +88,15 @@ def send_actuator_command(args, actuator_name, command_type, command_body):
     return reply
 
 
-def actuator_handler(args, sock, ip_address):
+def actuator_handler(args, sock):
+    logger = logging.getLogger(f'ACTUATOR_HANLDER_{threading.get_ident()}')
     try:
-        logger = logging.getLogger(f'ACTUATOR_HANDLER_{ip_address}')
-        logger.info('Gerenciando conexão com o atuador em %s', ip_address)
-        with args.db_actuators_lock:
-            actuator = args.db.get_actuator_name_by_ip(ip_address)
-        if actuator is None:
-            logger.warning(
-                'Não há nenhum atuador registrado com o endereço %s. '
-                'Encerrando conexão por segurança.',
-                ip_address,
-            )
-            return
-    except:
-        sock.shutdown(socket.SHUT_RDWR)
-        sock.close()
-        raise
-    try:
-        sock.settimeout(args.base_timeout)
         msg = sock.recv(1024)
         update = ActuatorUpdate()
         update.ParseFromString(msg)
     except Exception as e:
-        with args.db_actuators_lock:
-            args.db.mark_actuator_as_offline(actuator)
-            args.pending_actuators_updates.set()
         logger.error(
-            'Erro ao receber atualizações do atuador %s: (%s) %s',
-            actuator,
+            'Erro durante o recebimento de uma atualização: (%s) %s',
             type(e).__name__,
             e,
         )
@@ -123,9 +104,15 @@ def actuator_handler(args, sock, ip_address):
     finally:
         sock.shutdown(socket.SHUT_RDWR)
         sock.close()
+    if not args.db.is_actuator_registered(update.device_name):
+        logger.warning(
+            'Atuador não registrado enviando atualizações: %s',
+            update.device_name,
+        )
+        return
     logger.debug(
         'Atuador %s enviou uma atualização: (%s, %s)',
-        actuator,
+        update.device_name,
         update.timestamp,
         update.device_name,
     )
@@ -134,7 +121,7 @@ def actuator_handler(args, sock, ip_address):
     timestamp = datetime.fromisoformat(update.timestamp)
     with args.db_actuators_lock:
         result = args.db.add_actuator_update(
-            actuator,
+            update.device_name,
             state,
             metadata,
             timestamp,
@@ -157,7 +144,7 @@ def actuators_listener(args):
         with ThreadPoolExecutor(max_workers=5) as executor:
             while not args.stop_flag.is_set():
                 try:
-                    conn, addrs = sock.accept()
+                    conn, _ = sock.accept()
                 except TimeoutError:
                     continue
                 except Exception as e:
@@ -168,7 +155,7 @@ def actuators_listener(args):
                     )
                     continue
                 try:
-                    executor.submit(actuator_handler, args, conn, addrs[0])
+                    executor.submit(actuator_handler, args, conn)
                 except:
                     conn.shutdown(socket.SHUT_RDWR)
                     conn.close()
