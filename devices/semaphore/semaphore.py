@@ -283,6 +283,7 @@ def state_change_reporter(args):
             update = get_update_message(args, state, timestamp)
             try:
                 sock.send(update.SerializeToString())
+                logger.debug('Atualização de estado enviada ao Gateway')
             except Exception as e:
                 args.state_change.set()
                 if args.gateway_ip is not None:
