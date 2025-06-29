@@ -115,6 +115,7 @@ def main():
 
     # Timeouts
     args.base_timeout = 1.0
+    args.non_blocking_timeout = 0.0
     args.client_timeout = None
     args.actuators_timeout = None
     args.reports_timeout = None

@@ -3,7 +3,6 @@ import time
 import socket
 import logging
 from datetime import date, datetime
-from google.protobuf import message
 from messages_pb2 import SensorReading, SensorsReport
 
 
@@ -30,7 +29,8 @@ def sensors_report_generator(args):
                 is_online=is_online,
             )
         logger.debug(
-            'Novo relatório gerado: %d sensores reportados', len(sensors)
+            'Novo relatório gerado: %d sensores reportados',
+            len(sensors),
         )
         report = SensorsReport(devices=sensors).SerializeToString()
         with args.db_sensors_report_lock:
@@ -47,7 +47,7 @@ def sensors_listener(args):
             args.host_ip,
             args.sensors_port,
         )
-        # sock.settimeout(args.base_timeout)
+        sock.settimeout(args.non_blocking_timeout)
         while not args.stop_flag.is_set():
             try:
                 msg, _ = sock.recvfrom(1024)
@@ -56,7 +56,7 @@ def sensors_listener(args):
             except TimeoutError:
                 continue
             logger.debug(
-                'Leitura de temperatura recebida: (%s, %s, %.2f)',
+                'Leitura de sensor recebida: (%s, %s, %.6f)',
                 reading.timestamp,
                 reading.device_name,
                 reading.reading_value,
