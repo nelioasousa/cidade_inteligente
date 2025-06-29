@@ -184,12 +184,12 @@ class SendNextReport(_message.Message):
     def __init__(self) -> None: ...
 
 class ConnectionRequest(_message.Message):
-    __slots__ = ("sensors_report_port", "actuators_report_port")
-    SENSORS_REPORT_PORT_FIELD_NUMBER: _ClassVar[int]
-    ACTUATORS_REPORT_PORT_FIELD_NUMBER: _ClassVar[int]
-    sensors_report_port: int
-    actuators_report_port: int
-    def __init__(self, sensors_report_port: _Optional[int] = ..., actuators_report_port: _Optional[int] = ...) -> None: ...
+    __slots__ = ("sensors_port", "actuators_port")
+    SENSORS_PORT_FIELD_NUMBER: _ClassVar[int]
+    ACTUATORS_PORT_FIELD_NUMBER: _ClassVar[int]
+    sensors_port: int
+    actuators_port: int
+    def __init__(self, sensors_port: _Optional[int] = ..., actuators_port: _Optional[int] = ...) -> None: ...
 
 class ClientRequest(_message.Message):
     __slots__ = ("type", "device_name", "body")
