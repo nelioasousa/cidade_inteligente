@@ -339,7 +339,7 @@ def clients_listener(args):
             args.clients_port,
         )
         # sock.settimeout(args.base_timeout)
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=5) as executor:
             while not args.stop_flag.is_set():
                 try:
                     conn, addrs = sock.accept()

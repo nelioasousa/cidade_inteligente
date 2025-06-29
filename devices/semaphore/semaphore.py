@@ -5,6 +5,7 @@ import socket
 import logging
 import threading
 from datetime import datetime, UTC
+from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import Address
 from messages_pb2 import DeviceType, DeviceInfo, JoinRequest, JoinReply
 from messages_pb2 import ActuatorUpdate
@@ -121,8 +122,7 @@ def process_set_state_command(args, state_string):
     unknown_states = set(new_state) - set(args.state)
     if unknown_states:
         return None
-    # 'Phase' is read-only
-    if 'Phase' in new_state:
+    if 'Phase' in new_state:  # 'Phase' is read-only
         return None
     for period in ('GreenPeriod', 'YellowPeriod', 'RedPeriod'):
         try:
@@ -131,8 +131,7 @@ def process_set_state_command(args, state_string):
             continue
         if not isinstance(period, float):
             return None
-        # Período mínimo de 5 segundos
-        if period < 5.0:
+        if period < 5.0:  # Período mínimo de 5 segundos
             return None
     with args.state_lock:
         args.state.update(new_state)
@@ -146,37 +145,50 @@ def process_command(args, command, logger):
     match command.type:
         case CommandType.CT_ACTION:
             logger.debug('Comando do tipo CT_ACTION recebido')
-            with args.state_lock:
-                state = json.dumps(args.state)
-                timestamp = datetime.now(UTC).isoformat()
-            comply = ActuatorComply(
-                status=ComplyStatus.CS_UNKNOWN_ACTION,
-                update=build_update_message(args, state, timestamp),
-            )
+            status = ComplyStatus.CS_UNKNOWN_ACTION
+            result = None
         case CommandType.CT_GET_STATE:
             logger.debug('Comando do tipo CT_GET_STATE recebido')
-            with args.state_lock:
-                state = json.dumps(args.state)
-                timestamp = datetime.now(UTC).isoformat()
-            comply = ActuatorComply(
-                status=ComplyStatus.CS_OK,
-                update=build_update_message(args, state, timestamp),
-            )
+            status = ComplyStatus.CS_OK
+            result = None
         case CommandType.CT_SET_STATE:
             logger.debug('Comando do tipo CT_SET_STATE recebido')
             result = process_set_state_command(args, command.body)
             if result is None:
                 logger.debug('Comando CT_SET_STATE inválido')
                 status = ComplyStatus.CS_INVALID_STATE
-                with args.state_lock:
-                    state = json.dumps(args.state)
-                    timestamp = datetime.now(UTC).isoformat()
-                result = build_update_message(args, state, timestamp)
             else:
                 logger.debug('Comando CT_SET_STATE bem-sucedido')
                 status = ComplyStatus.CS_OK
-            comply = ActuatorComply(status=status, update=result)
-    return comply.SerializeToString()
+    if result is None:
+        with args.state_lock:
+            state = json.dumps(args.state)
+            timestamp = datetime.now(UTC).isoformat()
+        result = build_update_message(args, state, timestamp)
+    return ActuatorComply(status=status, update=result).SerializeToString()
+
+
+def command_handler(args, sock, address):
+    try:
+        logger = logging.getLogger(f'COMMAND_HANDLER_{address}')
+        if address[0] != args.gateway_ip:
+            logger.warning('Conexão indesejada rejeitada')
+            return
+        sock.settimeout(args.base_timeout)
+        msg = sock.recv(1024)
+        command = ActuatorCommand()
+        command.ParseFromString(msg)
+        comply = process_command(args, command, logger)
+        sock.send(comply)
+    except Exception as e:
+        logger.error(
+            'Erro durante processamento de um comando: (%s) %s',
+            type(e).__name__,
+            e,
+        )
+    finally:
+        sock.shutdown(socket.SHUT_RDWR)
+        sock.close()
 
 
 def command_listener(args):
@@ -195,7 +207,7 @@ def command_listener(args):
         except Exception as e:
             args.stop_flag.set()
             logger.error(
-                'Erro as iniciar socket de escuta '
+                'Erro as iniciar canal de escuta '
                 'de comandos em (%s, %s): (%s) %s',
                 args.host_ip,
                 args.port,
@@ -203,37 +215,25 @@ def command_listener(args):
                 e,
             )
             raise e
-        while not args.stop_flag.is_set():
-            try:
-                conn, addrs = sock.accept()
-                conn.settimeout(args.base_timeout)
-            except TimeoutError:
-                continue
-            except Exception as e:
-                logger.error(
-                    'Erro ao aceitar conexão com o Gateway: (%s) %s',
-                    type(e).__name__,
-                    e,
-                )
-                continue
-            try:
-                if addrs[0] != args.gateway_ip:
-                    logger.warning('Conexão indesejada rejeitada')
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            while not args.stop_flag.is_set():
+                try:
+                    conn, addrs = sock.accept()
+                except TimeoutError:
                     continue
-                command = ActuatorCommand()
-                command.ParseFromString(conn.recv(1024))
-                comply = process_command(args, command, logger)
-                conn.send(comply)
-            except Exception as e:
-                logger.error(
-                    'Erro durante processamento de um comando: (%s) %s',
-                    type(e).__name__,
-                    e,
-                )
-                continue
-            finally:
-                conn.shutdown(socket.SHUT_RDWR)
-                conn.close()
+                except Exception as e:
+                    logger.error(
+                        'Erro ao aceitar conexão: (%s) %s',
+                        type(e).__name__,
+                        e,
+                    )
+                    continue
+                try:
+                    executor.submit(command_handler, args, conn, addrs)
+                except:
+                    conn.shutdown(socket.SHUT_RDWR)
+                    conn.close()
+                    raise
 
 
 def state_change_reporter(args):

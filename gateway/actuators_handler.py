@@ -154,7 +154,7 @@ def actuators_listener(args):
             args.actuators_port,
         )
         sock.settimeout(args.base_timeout)
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=5) as executor:
             while not args.stop_flag.is_set():
                 try:
                     conn, addrs = sock.accept()
