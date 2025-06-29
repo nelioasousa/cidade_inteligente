@@ -114,10 +114,10 @@ def main():
     args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
 
     # Timeouts
-    args.base_timeout = 2.5
-    args.client_timeout = 5.0
-    args.actuators_timeout = 5.0
-    args.reports_timeout = 10.0
+    args.base_timeout = None
+    args.client_timeout = None
+    args.actuators_timeout = None
+    args.reports_timeout = None
 
     # Host IP
     args.host_ip = socket.gethostbyname(socket.gethostname())
