@@ -2,6 +2,7 @@ import time
 import json
 import socket
 import logging
+from threading import get_ident
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import Address, JoinRequest, JoinReply, DeviceType
@@ -29,14 +30,10 @@ def multicast_location(args):
             time.sleep(args.multicast_interval)
 
 
-def registration_handler(args, sock, address):
+def registration_handler(args, sock):
     try:
-        logger = logging.getLogger(f'REGISTRATION_HANDLER_{address}')
-        logger.info(
-            'Processando requisição de ingresso de um dispositivo em %s',
-            address[0],
-        )
-        sock.settimeout(args.base_timeout)
+        logger = logging.getLogger(f'REGISTRATION_HANDLER_{get_ident()}')
+        logger.info('Processando requisição de registro')
         msg = sock.recv(1024)
         request = JoinRequest()
         request.ParseFromString(msg)
@@ -65,16 +62,11 @@ def registration_handler(args, sock, address):
                 raise ValueError('Invalid DeviceType')
         reply = JoinReply(report_port=report_port)
         sock.send(reply.SerializeToString())
-        logger.info(
-            'Ingresso bem-sucedido do dispositivo %s em %s',
-            device_info.name,
-            address[0],
-        )
+        logger.info('Ingresso bem-sucedido: %s', device_info.name)
     except Exception as e:
         logger.error(
-            'Erro durante registro do dispositivo %s em %s: (%s) %s',
+            'Erro durante registro do dispositivo %s: (%s) %s',
             device_info.name,
-            address[0],
             type(e).__name__,
             e,
         )
@@ -99,11 +91,11 @@ def registration_listener(args):
         with ThreadPoolExecutor(max_workers=5) as executor:
             while not args.stop_flag.is_set():
                 try:
-                    conn, addrs = sock.accept()
+                    conn, _ = sock.accept()
                 except TimeoutError:
                     continue
                 try:
-                    executor.submit(registration_handler, args, conn, addrs)
+                    executor.submit(registration_handler, args, conn)
                 except:
                     conn.shutdown(socket.SHUT_RDWR)
                     conn.close()
