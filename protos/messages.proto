@@ -106,8 +106,8 @@ message ActuatorsReport {
 message SendNextReport {}
 
 message ConnectionRequest {
-  uint32 sensors_report_port = 1;
-  uint32 actuators_report_port = 2;
+  uint32 sensors_port = 1;
+  uint32 actuators_port = 2;
 }
 
 enum RequestType {

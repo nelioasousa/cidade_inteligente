@@ -282,8 +282,8 @@ def client_handler(args, sock, address):
         sensors_trans, actuators_trans = init_transmissions(
             args,
             address[0],
-            conn_req.sensors_report_port,
-            conn_req.actuators_report_port,
+            conn_req.sensors_port,
+            conn_req.actuators_port,
             trans_stop_flag
         )
         while not (args.stop_flag.is_set() or trans_stop_flag.is_set()):
