@@ -47,7 +47,7 @@ def sensors_listener(args):
             args.host_ip,
             args.sensors_port,
         )
-        sock.settimeout(args.non_blocking_timeout)
+        sock.settimeout(args.base_timeout)
         while not args.stop_flag.is_set():
             try:
                 msg, _ = sock.recvfrom(1024)

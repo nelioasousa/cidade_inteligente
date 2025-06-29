@@ -79,7 +79,7 @@ def main():
 
     parser.add_argument(
         '--actuators_port', type=int, default=50333,
-        help='Porta de recebimento dos dados dos atuadores. Usa UDP.'
+        help='Porta de recebimento dos dados dos atuadores. Usa TCP.'
     )
 
     parser.add_argument(
@@ -115,7 +115,6 @@ def main():
 
     # Timeouts
     args.base_timeout = 1.0
-    args.non_blocking_timeout = 0.0
     args.client_timeout = None
     args.actuators_timeout = None
     args.reports_timeout = None

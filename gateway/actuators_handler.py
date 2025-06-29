@@ -153,7 +153,7 @@ def actuators_listener(args):
             args.host_ip,
             args.actuators_port,
         )
-        sock.settimeout(args.non_blocking_timeout)
+        sock.settimeout(args.base_timeout)
         with ThreadPoolExecutor(max_workers=10) as executor:
             while not args.stop_flag.is_set():
                 try:

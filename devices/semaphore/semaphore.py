@@ -183,7 +183,7 @@ def command_listener(args):
     logger = logging.getLogger('COMMAND_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.settimeout(args.non_blocking_timeout)
+        sock.settimeout(args.base_timeout)
         try:
             sock.bind(('', args.port))
             sock.listen()
@@ -390,7 +390,6 @@ def main():
     args.name = f'Semaphore-{args.name}'
 
     # Timeouts
-    args.non_blocking_timeout = 0.0
     args.base_timeout = 2.0
     args.multicast_timeout = 5.0
 
