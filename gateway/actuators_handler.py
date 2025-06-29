@@ -74,7 +74,7 @@ def send_command_to_actuator(
         logger.warning('Atuador %s não está registrado', actuator_name)
         return None
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(args.actuators_timeout)
+        # sock.settimeout(args.actuators_timeout)
         try:
             sock.connect(actuator['address'])
         except Exception as e:
@@ -182,7 +182,7 @@ def actuators_listener(args):
             args.host_ip,
             args.actuators_port,
         )
-        sock.settimeout(args.base_timeout)
+        # sock.settimeout(args.base_timeout)
         with ThreadPoolExecutor(max_workers=10) as executor:
             while not args.stop_flag.is_set():
                 try:

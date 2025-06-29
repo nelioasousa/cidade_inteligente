@@ -21,7 +21,7 @@ def transmit_sensors_reports(args, address, stop_transmission_flag):
     )
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-        sock.settimeout(args.reports_timeout)
+        # sock.settimeout(args.reports_timeout)
         try:
             sock.connect(address)
         except Exception as e:
@@ -77,7 +77,7 @@ def transmit_actuators_reports(args, address, stop_transmission_flag):
     )
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-        sock.settimeout(args.reports_timeout)
+        # sock.settimeout(args.reports_timeout)
         try:
             sock.connect(address)
         except Exception as e:
@@ -268,7 +268,7 @@ def client_handler(args, sock, address):
     trans_stop_flag = threading.Event()
     try:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-        sock.settimeout(args.client_timeout)
+        # sock.settimeout(args.client_timeout)
         try:
             conn_req = ConnectionRequest()
             conn_req.ParseFromString(sock.recv(1024))
@@ -338,7 +338,7 @@ def clients_listener(args):
             args.host_ip,
             args.clients_port,
         )
-        sock.settimeout(args.base_timeout)
+        # sock.settimeout(args.base_timeout)
         with ThreadPoolExecutor(max_workers=10) as executor:
             while not args.stop_flag.is_set():
                 try:

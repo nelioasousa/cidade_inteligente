@@ -27,7 +27,7 @@ def gateway_discoverer(args):
             args.multicast_ip,
             args.multicast_port,
         )
-        sock.settimeout(args.multicast_timeout)
+        # sock.settimeout(args.multicast_timeout)
         fail_counter = 0
         while not args.stop_flag.is_set():
             try:
@@ -68,7 +68,7 @@ def disconnect_device(args):
 def try_to_connect(args, address, logger):
     logger.info('Tentando conexão com %s', address)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(args.base_timeout)
+        # sock.settimeout(args.base_timeout)
         try:
             sock.connect(address)
             with args.state_lock:
@@ -192,7 +192,7 @@ def command_listener(args):
                 type(e).__name__,
                 e,
             )
-        sock.settimeout(args.base_timeout)
+        # sock.settimeout(args.base_timeout)
         while not args.stop_flag.is_set():
             try:
                 conn, addrs = sock.accept()
@@ -256,7 +256,7 @@ def state_change_reporter(args):
             time.sleep(1.0)
             continue
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(args.gateway_timeout)
+            # sock.settimeout(args.gateway_timeout)
             try:
                 sock.connect((args.gateway_ip, args.transmission_port))
             except Exception as e:

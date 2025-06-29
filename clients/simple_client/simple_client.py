@@ -45,7 +45,7 @@ def register_actuators_report(args, report):
 def sensors_report_listener(args):
     logger = logging.getLogger('SENSORS_REPORT')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(args.streams_timeout)
+        # sock.settimeout(args.streams_timeout)
         sock.bind('', 0)
         sock.listen()
         args.sensors_port = sock.getsockname()[1]
@@ -55,7 +55,7 @@ def sensors_report_listener(args):
         )
         try:
             conn, _ = sock.accept()
-            conn.settimeout(args.base_timeout)
+            # conn.settimeout(args.base_timeout)
         except Exception as e:
             args.stop_flag.set()
             logger.error(
@@ -93,7 +93,7 @@ def sensors_report_listener(args):
 def actuators_report_listener(args):
     logger = logging.getLogger('ACTUATORS_REPORT')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(args.streams_timeout)
+        # sock.settimeout(args.streams_timeout)
         sock.bind('', 0)
         sock.listen()
         args.actuators_port = sock.getsockname()[1]
@@ -103,7 +103,7 @@ def actuators_report_listener(args):
         )
         try:
             conn, _ = sock.accept()
-            conn.settimeout(args.base_timeout)
+            # conn.settimeout(args.base_timeout)
         except Exception as e:
             args.stop_flag.set()
             logger.error(
@@ -232,7 +232,7 @@ def connect_to_gateway(args):
         sensors_port=args.sensors_port, actuators_port=args.actuators_port,
     ).SerializeToString()
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(args.connect_timeout)
+        # sock.settimeout(args.connect_timeout)
         sock.connect((args.gateway_ip, args.gateway_port))
         try:
             sock.send(conn_msg)

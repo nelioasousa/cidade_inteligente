@@ -35,7 +35,7 @@ def registration_handler(args, sock, addrs):
         'Processando requisição de ingresso de um dispositivo em %s', addrs
     )
     try:
-        sock.settimeout(args.base_timeout)
+        # sock.settimeout(args.base_timeout)
         req = JoinRequest()
         req.ParseFromString(sock.recv(1024))
         device_info = req.device_info
@@ -92,7 +92,7 @@ def registration_listener(args):
             args.host_ip,
             args.registration_port,
         )
-        sock.settimeout(args.base_timeout)
+        # sock.settimeout(args.base_timeout)
         with ThreadPoolExecutor(max_workers=10) as executor:
             while not args.stop_flag.is_set():
                 try:
