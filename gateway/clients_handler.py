@@ -4,7 +4,7 @@ import socket
 import logging
 import datetime
 import threading
-from actuators_handler import send_command_to_actuator
+from actuators_handler import send_actuator_command
 from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import ConnectionRequest
 from messages_pb2 import RequestType, ClientRequest
@@ -207,7 +207,7 @@ def process_client_request(args, request, from_address, logger):
                     status=ReplyStatus.RS_UNKNOWN_DEVICE,
                     reply_to=request.type,
                 )
-            actuator_comply = send_command_to_actuator(
+            actuator_comply = send_actuator_command(
                 args=args,
                 actuator_name=request.device_name,
                 command_type=CommandType.CT_SET_STATE,
@@ -236,7 +236,7 @@ def process_client_request(args, request, from_address, logger):
                     status=ReplyStatus.RS_UNKNOWN_DEVICE,
                     reply_to=request.type,
                 )
-            actuator_comply = send_command_to_actuator(
+            actuator_comply = send_actuator_command(
                 args=args,
                 actuator_name=request.device_name,
                 command_type=CommandType.CT_ACTION,

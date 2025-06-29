@@ -73,10 +73,16 @@ class Database:
     def is_actuator_registered(self, name):
         return name in self.devices[1]
 
-    def get_actuator_name_by_address(self, address):
+    def get_actuator_name_by_ip(self, ip_address):
         for actuator in self.devices[1].values():
-            if actuator['address'] == address:
+            if actuator['address'][0] == ip_address:
                 return actuator['name']
+        return None
+
+    def get_actuator_address_by_name(self, name):
+        for actuator in self.devices[1]:
+            if actuator == name:
+                return self.devices[1][name]['address']
         return None
 
     def add_sensor_reading(self, name, value, metadata, timestamp):
