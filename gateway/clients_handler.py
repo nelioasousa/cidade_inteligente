@@ -352,4 +352,9 @@ def clients_listener(args):
                         e,
                     )
                     continue
-                executor.submit(client_handler, args, conn, addrs)
+                try:
+                    executor.submit(client_handler, args, conn, addrs)
+                except:
+                    conn.shutdown(socket.SHUT_RDWR)
+                    conn.close()
+                    raise

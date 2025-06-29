@@ -102,4 +102,9 @@ def registration_listener(args):
                     conn, addrs = sock.accept()
                 except TimeoutError:
                     continue
-                executor.submit(registration_handler, args, conn, addrs)
+                try:
+                    executor.submit(registration_handler, args, conn, addrs)
+                except:
+                    conn.shutdown(socket.SHUT_RDWR)
+                    conn.close()
+                    raise

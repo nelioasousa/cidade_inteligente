@@ -167,4 +167,9 @@ def actuators_listener(args):
                         e,
                     )
                     continue
-                executor.submit(actuator_handler, args, conn, addrs[0])
+                try:
+                    executor.submit(actuator_handler, args, conn, addrs[0])
+                except:
+                    conn.shutdown(socket.SHUT_RDWR)
+                    conn.close()
+                    raise
