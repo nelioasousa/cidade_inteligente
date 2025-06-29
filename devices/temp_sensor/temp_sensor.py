@@ -25,36 +25,38 @@ def gateway_discoverer(args):
             args.multicast_ip,
             args.multicast_port,
         )
-        # sock.settimeout(args.multicast_timeout)
-        fail_counter = 0
+        sock.settimeout(args.multicast_timeout)
+        seq_fails = 0
         while not args.stop_flag.is_set():
             try:
                 msg = sock.recv(1024)
             except TimeoutError:
-                if args.gateway_ip is not None:
-                    fail_counter += 1
-                    if fail_counter >= args.disconnect_after:
-                        logger.warning(
-                            'Gateway em %s offline: falhou %d '
-                            'transmissões em sequência. Desconectando...',
-                            args.gateway_ip,
-                            args.disconnect_after,
-                        )
-                        disconnect_device(args)
+                seq_fails += 1
+                if (
+                    args.gateway_ip is not None
+                    and seq_fails >= args.disconnect_after
+                ):
+                    logger.warning(
+                        'Gateway em %s está offline: falhou %d '
+                        'transmissões em sequência. Desconectando...',
+                        args.gateway_ip,
+                        args.disconnect_after,
+                    )
+                    disconnect_device(args)
                 continue
             gateway_addrs = Address()
             gateway_addrs.ParseFromString(msg)
-            fail_counter = 0
+            seq_fails = 0
+            if gateway_addrs.ip == args.gateway_ip:
+                continue
             if args.gateway_ip is not None:
-                if gateway_addrs.ip == args.gateway_ip:
-                    continue
-                else:
-                    logger.warning(
-                        'Gateway realocado de %s para %s. Desconectando...',
-                        args.gateway_ip, gateway_addrs.ip,
-                    )
-                    disconnect_device(args)
-            try_to_connect(args, (gateway_addrs.ip, gateway_addrs.port), logger)
+                logger.warning(
+                    'Gateway realocado de %s para %s. Desconectando...',
+                    args.gateway_ip,
+                    gateway_addrs.ip,
+                )
+                disconnect_device(args)
+            try_to_register(args, (gateway_addrs.ip, gateway_addrs.port), logger)
 
 
 def disconnect_device(args):
@@ -63,38 +65,38 @@ def disconnect_device(args):
     return
 
 
-def try_to_connect(args, address, logger):
-    logger.info('Tentando conexão com %s', address)
+def try_to_register(args, address, logger):
+    logger.info('Tentando registro no endereço %s', address)
+    sensor_info = DeviceInfo(
+        type=DeviceType.DT_SENSOR,
+        name=args.name,
+        metadata=json.dumps(args.metadata),
+    )
+    sensor_addrs = Address(ip=args.host_ip, port=0)
+    join_request = JoinRequest(
+        device_info=sensor_info, device_address=sensor_addrs,
+    )
+    join_request = join_request.SerializeToString()
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        # sock.settimeout(args.base_timeout)
+        sock.settimeout(args.base_timeout)
         try:
             sock.connect(address)
-            device_info = DeviceInfo(
-                type=DeviceType.DT_SENSOR,
-                name=args.name,
-                metadata=json.dumps(args.metadata),
-            )
-            device_address = Address(ip=args.host_ip, port=0)
-            join_request = JoinRequest(
-                device_info=device_info,
-                device_address=device_address,
-            )
-            sock.send(join_request.SerializeToString())
+            sock.send(join_request)
             join_reply = JoinReply()
             join_reply.ParseFromString(sock.recv(1024))
         except Exception as e:
             logger.warning(
-                'Erro durante tentativa de conexão com %s: (%s) %s',
+                'Erro durante tentativa de registro em %s: (%s) %s',
                 address,
                 type(e).__name__,
                 e,
             )
             return
+        finally:
+            sock.shutdown(socket.SHUT_RDWR)
     args.gateway_ip = address[0]
     args.transmission_port = join_reply.report_port
-    logger.info(
-        'Conexão bem-sucedida com o Gateway em (%s, %s)', address,
-    )
+    logger.info('Registro bem-sucedido com o Gateway em %s', address[0])
     return
 
 
@@ -112,24 +114,18 @@ def transmit_readings(args):
         while not args.stop_flag.is_set():
             if args.gateway_ip is None:
                 logger.info('Transmissão interrompida. Sem conexão com o Gateway')
-                time.sleep(5.0)
-            else:
-                reading = SensorReading(
-                    device_name=args.name,
-                    reading_value=get_reading(args),
-                    timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
-                    metadata=json.dumps(args.metadata),
-                )
-                sock.sendto(
-                    reading.SerializeToString(),
-                    (args.gateway_ip, args.transmission_port),
-                )
-                logger.debug(
-                    'Leitura de temperatura enviada para (%s, %s)',
-                    args.gateway_ip,
-                    args.transmission_port,
-                )
-                time.sleep(args.report_interval)
+                time.sleep(1.0)
+                continue
+            reading = SensorReading(
+                device_name=args.name,
+                reading_value=get_reading(args),
+                timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
+                metadata=json.dumps(args.metadata),
+            )
+            addrs = (args.gateway_ip, args.transmission_port)
+            sock.sendto(reading.SerializeToString(), addrs)
+            logger.debug('Leitura de temperatura enviada para %s', addrs)
+            time.sleep(args.report_interval)
 
 
 def _run(args):
@@ -212,7 +208,7 @@ def main():
     args.name = f'Temperature-{args.name}'
 
     # Timeouts
-    args.base_timeout = 2.5
+    args.base_timeout = 2.0
     args.multicast_timeout = 5.0
 
     # Host IP

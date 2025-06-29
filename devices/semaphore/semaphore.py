@@ -3,8 +3,8 @@ import time
 import json
 import socket
 import logging
-import datetime
 import threading
+from datetime import datetime, UTC
 from messages_pb2 import Address
 from messages_pb2 import DeviceType, DeviceInfo, JoinRequest, JoinReply
 from messages_pb2 import ActuatorUpdate
@@ -27,36 +27,38 @@ def gateway_discoverer(args):
             args.multicast_ip,
             args.multicast_port,
         )
-        # sock.settimeout(args.multicast_timeout)
-        fail_counter = 0
+        sock.settimeout(args.multicast_timeout)
+        seq_fails = 0
         while not args.stop_flag.is_set():
             try:
                 msg = sock.recv(1024)
             except TimeoutError:
-                if args.gateway_ip is not None:
-                    fail_counter += 1
-                    if fail_counter >= args.disconnect_after:
-                        logger.warning(
-                            'Gateway em %s offline: falhou %d '
-                            'transmissões em sequência. Desconectando...',
-                            args.gateway_ip,
-                            args.disconnect_after,
-                        )
-                        disconnect_device(args)
+                seq_fails += 1
+                if (
+                    args.gateway_ip is not None
+                    and seq_fails >= args.disconnect_after
+                ):
+                    logger.warning(
+                        'Gateway em %s está offline: falhou %d '
+                        'transmissões em sequência. Desconectando...',
+                        args.gateway_ip,
+                        args.disconnect_after,
+                    )
+                    disconnect_device(args)
                 continue
             gateway_addrs = Address()
             gateway_addrs.ParseFromString(msg)
-            fail_counter = 0
+            seq_fails = 0
+            if gateway_addrs.ip == args.gateway_ip:
+                continue
             if args.gateway_ip is not None:
-                if gateway_addrs.ip == args.gateway_ip:
-                    continue
-                else:
-                    logger.warning(
-                        'Gateway realocado de %s para %s. Desconectando...',
-                        args.gateway_ip, gateway_addrs.ip,
-                    )
-                    disconnect_device(args)
-            try_to_connect(args, (gateway_addrs.ip, gateway_addrs.port), logger)
+                logger.warning(
+                    'Gateway realocado de %s para %s. Desconectando...',
+                    args.gateway_ip,
+                    gateway_addrs.ip,
+                )
+                disconnect_device(args)
+            try_to_register(args, (gateway_addrs.ip, gateway_addrs.port), logger)
 
 
 def disconnect_device(args):
@@ -65,47 +67,47 @@ def disconnect_device(args):
     return
 
 
-def try_to_connect(args, address, logger):
-    logger.info('Tentando conexão com %s', address)
+def try_to_register(args, address, logger):
+    logger.info('Tentando registro no endereço %s', address)
+    with args.state_lock:
+        state = json.dumps(args.state)
+        timestamp = datetime.now(UTC).isoformat()
+    actuator_info = DeviceInfo(
+        type=DeviceType.DT_ACTUATOR,
+        name=args.name,
+        state=state,
+        metadata=json.dumps(args.metadata),
+        timestamp=timestamp,
+    )
+    actuator_address = Address(ip=args.host_ip, port=args.port)
+    join_request = JoinRequest(
+        device_info=actuator_info, device_address=actuator_address,
+    )
+    join_request = join_request.SerializeToString()
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        # sock.settimeout(args.base_timeout)
+        sock.settimeout(args.base_timeout)
         try:
             sock.connect(address)
-            with args.state_lock:
-                state = json.dumps(args.state)
-                timestamp = datetime.datetime.now(datetime.UTC).isoformat()
-            device_info = DeviceInfo(
-                type=DeviceType.DT_ACTUATOR,
-                name=args.name,
-                state=state,
-                metadata=json.dumps(args.metadata),
-                timestamp=timestamp,
-            )
-            device_address = Address(ip=args.host_ip, port=args.port)
-            join_request = JoinRequest(
-                device_info=device_info,
-                device_address=device_address,
-            )
-            sock.send(join_request.SerializeToString())
+            sock.send(join_request)
             join_reply = JoinReply()
             join_reply.ParseFromString(sock.recv(1024))
         except Exception as e:
             logger.warning(
-                'Erro durante tentativa de conexão com %s: (%s) %s',
+                'Erro durante tentativa de registro em %s: (%s) %s',
                 address,
                 type(e).__name__,
                 e,
             )
             return
+        finally:
+            sock.shutdown(socket.SHUT_RDWR)
     args.gateway_ip = address[0]
     args.transmission_port = join_reply.report_port
-    logger.info(
-        'Conexão bem-sucedida com o Gateway em (%s, %s)', address,
-    )
+    logger.info('Registro bem-sucedido com o Gateway em %s', address[0])
     return
 
 
-def get_update_message(args, state, timestamp):
+def build_update_message(args, state, timestamp):
     return ActuatorUpdate(
         device_name=args.name,
         state=state,
@@ -119,6 +121,7 @@ def process_set_state_command(args, state_string):
     unknown_states = set(new_state) - set(args.state)
     if unknown_states:
         return None
+    # 'Phase' is read-only
     if 'Phase' in new_state:
         return None
     for period in ('GreenPeriod', 'YellowPeriod', 'RedPeriod'):
@@ -135,37 +138,42 @@ def process_set_state_command(args, state_string):
         args.state.update(new_state)
         args.state_change.set()
         state = json.dumps(args.state)
-        timestamp = datetime.datetime.now(datetime.UTC).isoformat()
-    return get_update_message(args, state, timestamp)
+        timestamp = datetime.now(UTC).isoformat()
+    return build_update_message(args, state, timestamp)
 
 
 def process_command(args, command, logger):
     match command.type:
         case CommandType.CT_ACTION:
-            logger.debug('Semáforo recebeu uma requisição do tipo CT_ACTION')
+            logger.debug('Comando do tipo CT_ACTION recebido')
             with args.state_lock:
                 state = json.dumps(args.state)
-                timestamp = datetime.datetime.now(datetime.UTC).isoformat()
+                timestamp = datetime.now(UTC).isoformat()
             comply = ActuatorComply(
                 status=ComplyStatus.CS_UNKNOWN_ACTION,
-                update=get_update_message(args, state, timestamp),
+                update=build_update_message(args, state, timestamp),
             )
         case CommandType.CT_GET_STATE:
-            logger.debug('Semáforo recebeu uma requisição do tipo CT_GET_STATE')
+            logger.debug('Comando do tipo CT_GET_STATE recebido')
             with args.state_lock:
                 state = json.dumps(args.state)
-                timestamp = datetime.datetime.now(datetime.UTC).isoformat()
+                timestamp = datetime.now(UTC).isoformat()
             comply = ActuatorComply(
                 status=ComplyStatus.CS_OK,
-                update=get_update_message(args, state, timestamp),
+                update=build_update_message(args, state, timestamp),
             )
         case CommandType.CT_SET_STATE:
+            logger.debug('Comando do tipo CT_SET_STATE recebido')
             result = process_set_state_command(args, command.body)
             if result is None:
-                logger.debug('Requisição CT_SET_STATE gerou CS_INVALID_STATE')
+                logger.debug('Comando CT_SET_STATE inválido')
                 status = ComplyStatus.CS_INVALID_STATE
+                with args.state_lock:
+                    state = json.dumps(args.state)
+                    timestamp = datetime.now(UTC).isoformat()
+                result = build_update_message(args, state, timestamp)
             else:
-                logger.debug('Requisição CT_SET_STATE respondida com sucesso')
+                logger.debug('Comando CT_SET_STATE bem-sucedido')
                 status = ComplyStatus.CS_OK
             comply = ActuatorComply(status=status, update=result)
     return comply.SerializeToString()
@@ -175,6 +183,7 @@ def command_listener(args):
     logger = logging.getLogger('COMMAND_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.settimeout(args.non_blocking_timeout)
         try:
             sock.bind(('', args.port))
             sock.listen()
@@ -184,6 +193,7 @@ def command_listener(args):
                 args.port,
             )
         except Exception as e:
+            args.stop_flag.set()
             logger.error(
                 'Erro as iniciar socket de escuta '
                 'de comandos em (%s, %s): (%s) %s',
@@ -192,15 +202,16 @@ def command_listener(args):
                 type(e).__name__,
                 e,
             )
-        # sock.settimeout(args.base_timeout)
+            raise e
         while not args.stop_flag.is_set():
             try:
                 conn, addrs = sock.accept()
+                conn.settimeout(args.base_timeout)
             except TimeoutError:
                 continue
             except Exception as e:
                 logger.error(
-                    'Erro ao tentar conexão com o Gateway: (%s) %s',
+                    'Erro ao aceitar conexão com o Gateway: (%s) %s',
                     type(e).__name__,
                     e,
                 )
@@ -208,37 +219,14 @@ def command_listener(args):
             try:
                 if addrs[0] != args.gateway_ip:
                     logger.warning('Conexão indesejada rejeitada')
-                    conn.shutdown(socket.SHUT_RDWR)
-                    conn.close()
                     continue
                 command = ActuatorCommand()
                 command.ParseFromString(conn.recv(1024))
-            except Exception as e:
-                logger.error(
-                    'Erro ao receber comando do Gateway: (%s) %s',
-                    type(e).__name__,
-                    e,
-                )
-                conn.shutdown(socket.SHUT_RDWR)
-                conn.close()
-                continue
-            try:
                 comply = process_command(args, command, logger)
-            except Exception as e:
-                logger.error(
-                    'Erro ao processar comando do Gateway: (%s) %s',
-                    type(e).__name__,
-                    e,
-                )
-                conn.shutdown(socket.SHUT_RDWR)
-                conn.close()
-                continue
-            try:
                 conn.send(comply)
             except Exception as e:
                 logger.error(
-                    'Erro ao enviar mensagem de '
-                    'cumprimento de comando: (%s) %s',
+                    'Erro durante processamento de um comando: (%s) %s',
                     type(e).__name__,
                     e,
                 )
@@ -252,41 +240,45 @@ def state_change_reporter(args):
     logger = logging.getLogger('STATE_CHANGE_REPORTER')
     logger.info('Iniciando thread de divulgação de atualizações')
     while not args.stop_flag.is_set():
+        transmission_addrs = (args.gateway_ip, args.transmission_port)
+        if transmission_addrs[0] is None:
+            logger.info('Transmissão interrompida. Sem conexão com o Gateway')
+            time.sleep(1.0)
+            continue
         if not args.state_change.is_set():
             time.sleep(1.0)
             continue
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            # sock.settimeout(args.gateway_timeout)
+            sock.settimeout(args.base_timeout)
             try:
-                sock.connect((args.gateway_ip, args.transmission_port))
+                sock.connect(transmission_addrs)
             except Exception as e:
-                if args.gateway_ip is not None:
-                    logger.error(
-                        'Conexão com (%s, %s) falhou: (%s) %s',
-                        args.gateway_ip,
-                        args.transmission_port,
-                        type(e).__name__,
-                        e,
-                    )
+                logger.error(
+                    'Conexão com o Gateway em %s falhou: (%s) %s',
+                    transmission_addrs,
+                    type(e).__name__,
+                    e,
+                )
                 continue
-            with args.state_lock:
-                state = json.dumps(args.state)
-                args.state_change.clear()
-                timestamp = datetime.datetime.now(datetime.UTC).isoformat()
-            update = get_update_message(args, state, timestamp)
             try:
+                with args.state_lock:
+                    state = json.dumps(args.state)
+                    args.state_change.clear()
+                    timestamp = datetime.now(UTC).isoformat()
+                update = build_update_message(args, state, timestamp)
                 sock.send(update.SerializeToString())
-                logger.debug('Atualização de estado enviada ao Gateway')
+                logger.debug(
+                    'Atualização de estado enviada para %s',
+                    transmission_addrs,
+                )
             except Exception as e:
                 args.state_change.set()
-                if args.gateway_ip is not None:
-                    logger.error(
-                        'Erro ao enviar atualização para (%s, %s): (%s, %s)',
-                        args.gateway_ip,
-                        args.transmission_port,
-                        type(e).__name__,
-                        e,
-                    )
+                logger.error(
+                    'Erro ao enviar atualização para %s: (%s) %s',
+                    transmission_addrs,
+                    type(e).__name__,
+                    e,
+                )
                 continue
             finally:
                 sock.shutdown(socket.SHUT_RDWR)
@@ -317,7 +309,7 @@ def simulator(args):
     phases = phase_generator(args)
     while not args.stop_flag.is_set():
         phase, period = next(phases)
-        logger.debug(f'Fase "{phase}" começou: duranção de {period} secs')
+        logger.debug(f'Fase "{phase}" começou: duração de {period} secs')
         time.sleep(period)
 
 
@@ -398,9 +390,9 @@ def main():
     args.name = f'Semaphore-{args.name}'
 
     # Timeouts
-    args.base_timeout = 2.5
+    args.non_blocking_timeout = 0.0
+    args.base_timeout = 2.0
     args.multicast_timeout = 5.0
-    args.gateway_timeout = 2.0
 
     # Host IP
     args.host_ip = socket.gethostbyname(socket.gethostname())
@@ -419,7 +411,8 @@ def main():
     args.metadata = {
         'Location': {'Latitude': -3.734431, 'Longitude': -38.568971},
         'Target': "R. Licurgo Montenegro X Av. Governador Parsifal Barroso",
-        'Phases': ('Unset', 'Green', 'Yellow', 'Red'),
+        'Phases': ['Unset', 'Green', 'Yellow', 'Red'],
+        'Actions': [],
     }
 
     # Events and locks
