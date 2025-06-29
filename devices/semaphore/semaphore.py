@@ -34,33 +34,29 @@ def gateway_discoverer(args):
                 msg = sock.recv(1024)
             except TimeoutError:
                 if args.gateway_ip is not None:
-                    logger.warning(
-                        'Falha de transmissão do Gateway em %s',
-                        args.gateway_ip,
-                    )
                     fail_counter += 1
                     if fail_counter >= args.disconnect_after:
                         logger.warning(
-                            'Gateway offline: falhou %d transmissões '
-                            'em sequência. Desconectando...',
+                            'Gateway em %s offline: falhou %d '
+                            'transmissões em sequência. Desconectando...',
+                            args.gateway_ip,
                             args.disconnect_after,
                         )
                         disconnect_device(args)
                 continue
             gateway_addrs = Address()
             gateway_addrs.ParseFromString(msg)
+            fail_counter = 0
             if args.gateway_ip is not None:
                 if gateway_addrs.ip == args.gateway_ip:
                     continue
                 else:
                     logger.warning(
-                        'Gateway realocado de %s para %s. '
-                        'Desconectando...',
+                        'Gateway realocado de %s para %s. Desconectando...',
                         args.gateway_ip, gateway_addrs.ip,
                     )
                     disconnect_device(args)
-            if try_to_connect(args, (gateway_addrs.ip, gateway_addrs.port)):
-                fail_counter = 0
+            try_to_connect(args, (gateway_addrs.ip, gateway_addrs.port), logger)
 
 
 def disconnect_device(args):
@@ -69,13 +65,12 @@ def disconnect_device(args):
     return
 
 
-def try_to_connect(args, addrs):
-    logger = logging.getLogger('TRY_CONNECTION')
-    logger.info('Tentando conexão com %s', addrs)
+def try_to_connect(args, address, logger):
+    logger.info('Tentando conexão com %s', address)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(args.base_timeout)
         try:
-            sock.connect(addrs)
+            sock.connect(address)
             with args.state_lock:
                 state = json.dumps(args.state)
                 timestamp = datetime.datetime.now(datetime.UTC).isoformat()
@@ -97,19 +92,17 @@ def try_to_connect(args, addrs):
         except Exception as e:
             logger.warning(
                 'Erro durante tentativa de conexão com %s: (%s) %s',
-                addrs,
+                address,
                 type(e).__name__,
                 e,
             )
-            return False
-    args.gateway_ip = addrs[0]
+            return
+    args.gateway_ip = address[0]
     args.transmission_port = join_reply.report_port
     logger.info(
-        'Conexão bem-sucedida com o Gateway em (%s, %s)',
-        addrs[0],
-        join_reply.report_port,
+        'Conexão bem-sucedida com o Gateway em (%s, %s)', address,
     )
-    return True
+    return
 
 
 def get_update_message(args, state, timestamp):

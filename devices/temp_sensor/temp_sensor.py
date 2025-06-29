@@ -18,11 +18,12 @@ def gateway_discoverer(args):
         sock.setsockopt(
             socket.IPPROTO_IP,
             socket.IP_ADD_MEMBERSHIP,
-            socket.inet_aton(args.multicast_ip) + socket.inet_aton('0.0.0.0')
+            socket.inet_aton(args.multicast_ip) + socket.inet_aton('0.0.0.0'),
         )
         logger.info(
             'Procurando pelo Gateway no grupo multicast (%s, %s)',
-            args.multicast_ip, args.multicast_port
+            args.multicast_ip,
+            args.multicast_port,
         )
         sock.settimeout(args.multicast_timeout)
         fail_counter = 0
@@ -31,31 +32,29 @@ def gateway_discoverer(args):
                 msg = sock.recv(1024)
             except TimeoutError:
                 if args.gateway_ip is not None:
-                    logger.warning(
-                        'Falha de transmissão do Gateway em %s', args.gateway_ip
-                    )
                     fail_counter += 1
                     if fail_counter >= args.disconnect_after:
                         logger.warning(
-                            'Gateway offline: falhou %d transmissões em '
-                            'sequência. Desconectando sensor...',
-                            args.disconnect_after
+                            'Gateway em %s offline: falhou %d '
+                            'transmissões em sequência. Desconectando...',
+                            args.gateway_ip,
+                            args.disconnect_after,
                         )
                         disconnect_device(args)
                 continue
             gateway_addrs = Address()
             gateway_addrs.ParseFromString(msg)
+            fail_counter = 0
             if args.gateway_ip is not None:
                 if gateway_addrs.ip == args.gateway_ip:
                     continue
                 else:
                     logger.warning(
-                        'Gateway realocado de %s para %s. Desconectando sensor...',
+                        'Gateway realocado de %s para %s. Desconectando...',
                         args.gateway_ip, gateway_addrs.ip,
                     )
                     disconnect_device(args)
-            if try_to_connect(args, (gateway_addrs.ip, gateway_addrs.port)):
-                fail_counter = 0
+            try_to_connect(args, (gateway_addrs.ip, gateway_addrs.port), logger)
 
 
 def disconnect_device(args):
@@ -64,13 +63,12 @@ def disconnect_device(args):
     return
 
 
-def try_to_connect(args, addrs):
-    logger = logging.getLogger('TRY_CONNECTION')
-    logger.info('Tentando conexão com %s', addrs)
+def try_to_connect(args, address, logger):
+    logger.info('Tentando conexão com %s', address)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(args.base_timeout)
         try:
-            sock.connect(addrs)
+            sock.connect(address)
             device_info = DeviceInfo(
                 type=DeviceType.DT_SENSOR,
                 name=args.name,
@@ -87,16 +85,17 @@ def try_to_connect(args, addrs):
         except Exception as e:
             logger.warning(
                 'Erro durante tentativa de conexão com %s: (%s) %s',
-                addrs, type(e).__name__, e
+                address,
+                type(e).__name__,
+                e,
             )
-            return False
-    args.gateway_ip = addrs[0]
+            return
+    args.gateway_ip = address[0]
     args.transmission_port = join_reply.report_port
     logger.info(
-        'Conexão bem-sucedida com o Gateway em (%s, %s)',
-        addrs[0], join_reply.report_port
+        'Conexão bem-sucedida com o Gateway em (%s, %s)', address,
     )
-    return True
+    return
 
 
 def get_reading(args):
