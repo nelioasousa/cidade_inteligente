@@ -29,18 +29,20 @@ def multicast_location(args):
             time.sleep(args.multicast_interval)
 
 
-def registration_handler(args, sock, addrs):
-    logger = logging.getLogger(f'REGISTRATION_HANDLER_{addrs}')
-    logger.info(
-        'Processando requisição de ingresso de um dispositivo em %s', addrs
-    )
+def registration_handler(args, sock, address):
     try:
-        # sock.settimeout(args.base_timeout)
-        req = JoinRequest()
-        req.ParseFromString(sock.recv(1024))
-        device_info = req.device_info
-        device_addrs = req.device_address
-        match req.device_info.type:
+        logger = logging.getLogger(f'REGISTRATION_HANDLER_{address}')
+        logger.info(
+            'Processando requisição de ingresso de um dispositivo em %s',
+            address[0],
+        )
+        sock.settimeout(args.base_timeout)
+        msg = sock.recv(1024)
+        request = JoinRequest()
+        request.ParseFromString(msg)
+        device_info = request.device_info
+        device_addrs = request.device_address
+        match request.device_info.type:
             case DeviceType.DT_SENSOR:
                 report_port = args.sensors_port
                 with args.db_sensors_lock:
@@ -60,22 +62,23 @@ def registration_handler(args, sock, addrs):
                         timestamp=datetime.fromisoformat(device_info.timestamp),
                     )
             case _:
-                raise RuntimeError('Invalid device type')
+                raise ValueError('Invalid DeviceType')
         reply = JoinReply(report_port=report_port)
         sock.send(reply.SerializeToString())
         logger.info(
             'Ingresso bem-sucedido do dispositivo %s em %s',
             device_info.name,
-            addrs,
+            address[0],
         )
     except Exception as e:
         logger.error(
             'Erro durante registro do dispositivo %s em %s: (%s) %s',
             device_info.name,
-            addrs,
+            address[0],
             type(e).__name__,
             e,
         )
+        raise e
     finally:
         sock.shutdown(socket.SHUT_RDWR)
         sock.close()
@@ -92,7 +95,7 @@ def registration_listener(args):
             args.host_ip,
             args.registration_port,
         )
-        # sock.settimeout(args.base_timeout)
+        sock.settimeout(args.base_timeout)
         with ThreadPoolExecutor(max_workers=10) as executor:
             while not args.stop_flag.is_set():
                 try:
