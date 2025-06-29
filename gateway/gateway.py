@@ -1,5 +1,4 @@
 import sys
-import time
 import socket
 import threading
 import logging
@@ -17,7 +16,7 @@ def _run(args):
         format='[%(levelname)s %(asctime)s] %(name)s\n  %(message)s',
     )
     try:
-        jlistener = threading.Thread(
+        rlistener = threading.Thread(
             target=registration_listener, args=(args,)
         )
         slistener = threading.Thread(
@@ -35,7 +34,7 @@ def _run(args):
         agenerator = threading.Thread(
             target=actuators_report_generator, args=(args,)
         )
-        jlistener.start()
+        rlistener.start()
         slistener.start()
         alistener.start()
         multicaster.start()
@@ -45,11 +44,11 @@ def _run(args):
     except BaseException as e:
         args.stop_flag.set()
         if isinstance(e, KeyboardInterrupt):
-            print('\nDESLIGANDO...')
+            print('\nSHUTTING DOWN...')
         else:
             raise e
     finally:
-        jlistener.join()
+        rlistener.join()
         slistener.join()
         alistener.join()
         multicaster.join()
