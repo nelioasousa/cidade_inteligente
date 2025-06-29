@@ -1,6 +1,6 @@
 const net = require('net');
 const protobuf = require("protobufjs");
-const { ActuatorUpdate, JoinRequest, JoinReply, DeviceType, DeviceInfo, Address } = require('./protos/messages_pb');
+const { ActuatorUpdate, JoinRequest, JoinReply, DeviceType, DeviceInfo, Address, ActuatorCommand, ActuatorComply, CommandType, ComplyStatus} = require('./protos/messages_pb');
 
 /**
  * Informaçoes do Cliente <> Gateway
@@ -12,9 +12,9 @@ let IS_ONLINE = false;
  * Informaçoes do atuador
  */
 const DEVICE_NAME = "LAMP";
-let LAMP_STATE = '{"isOn": "sim", "Color": "yellow", "Brightness": 10}';
-const LAMP_METADATA = '{"isOn": "(sim ou nao)", "Color": "(yellow ou branco)", "Brightness": "(Entre 1 a 10)"}';
-const PORT_ATUADOR = 60222;
+let LAMP_STATE = '{"isOn": "yes", "Color": "yellow", "Brightness": 10}';
+const LAMP_METADATA = '{"isOn": "(yes ou no)", "Color": "(yellow ou white)", "Brightness": (Between 1 and 10)"}';
+const PORT_ATUADOR = 60555;
 const HOST_ATUADOR = '127.0.0.1';
 
 /**
@@ -65,34 +65,12 @@ function connectToGateway(ipGateway, portGateway) {
     // Criando uma nova conexao TCP com o Gateway em outra porta
     connectionGateway = net.createConnection({
         host: ipGateway,
-        port: portGatewayToConnect
+        port: portGatewayToConnect //50333
     }, () => {
         console.log(`Conectado ao gateway ${ipGateway}:${portGatewayToConnect}`);
     });
 
-    // Recebendo comandos do Gateway
-    connectionGateway.on('data', (data) => {
-
-        const actuatorUpdate = ActuatorUpdate.deserializeBinary(data);
-
-        LAMP_STATE.STATE = actuatorUpdate.state;
-        IS_ONLINE = actuatorUpdate.is_online;
-
-        //colocar dentro do cliente <> gateway
-        const dataResp = new ActuatorUpdate();
-        dataResp.setDeviceName(DEVICE_NAME);
-        dataResp.setState(LAMP_STATE.STATE);
-        dataResp.setMetadata(LAMP_METADATA);
-        dataResp.setTimestamp(new Date(Date.now()).toString());
-        dataResp.setIsOnline(IS_ONLINE);
-
-        const msgResponse = dataResp.serializeBinary();
-
-        // Envia a mensagem para gateway
-        connectionGateway.write(msgResponse);
-
-    });
-
+    // criando servidor atuador porta 60555
     startServer();
 }
 
@@ -103,33 +81,49 @@ function startServer() {
         // Receber comandos
         socket.on('data', (data) => {
             
-            const actuatorUpdate = ActuatorUpdate.deserializeBinary(data);
+            // ActuatorCommand -> recebe
+            const actuatorCommand = ActuatorCommand.deserializeBinary(data);
 
-            LAMP_STATE.STATE = actuatorUpdate.getState();
-            IS_ONLINE = actuatorUpdate.getIsOnline();
-            
-            //colocar dentro do cliente <> gateway
-            const dataResp = new ActuatorUpdate();
-            dataResp.setDeviceName(DEVICE_NAME);
-            dataResp.setState(LAMP_STATE.STATE);
-            dataResp.setMetadata(LAMP_METADATA);
-            dataResp.setTimestamp(new Date(Date.now()).toString());
-            dataResp.setIsOnline(IS_ONLINE);
-
-            const msgResponse = dataResp.serializeBinary();
-  
-            // Envia a mensagem para gateway
-            connectionGateway.write(msgResponse);
+            if (actuatorCommand == CommandType.CT_GET_STATE) {
+                sendDataGateway(ComplyStatus.CS_OK);
+            } else if (actuatorCommand == CommandType.CT_ACTION) {
+                if (actuatorCommand.getBody().toLowerCase() == "off") {
+                    IS_ONLINE = false;
+                    sendDataGateway(ComplyStatus.CS_OK);
+                }
+                else if (actuatorCommand.getBody().toLowerCase() == "on") {
+                    IS_ONLINE = true;
+                    sendDataGateway(ComplyStatus.CS_OK);
+                }
+                else {
+                    sendDataGateway(ComplyStatus.CS_UNKNOWN_ACTION);
+                }
+            }
+            else if (actuatorCommand == CommandType.CT_SET_STATE) {
+                if (validarBody()) {
+                    LAMP_STATE.STATE = actuatorCommand.getBody();
+                    sendDataGateway(ComplyStatus.CS_OK);
+                }
+                else {
+                    sendDataGateway(ComplyStatus.CS_INVALID_STATE);
+                }
+                
+            }
+            else if (actuatorCommand == CommandType.CT_UNSPECIFIED) {
+                sendDataGateway(ComplyStatus.CS_UNSPECIFIED);
+            }
         });
 
         // Evento: cliente desconectado
         socket.on('end', () => {
-            console.log('Gateway desconectado');
+            sendDataGateway(ComplyStatus.CS_FAIL);
+            console.log('Atuador desconectado');
         });
 
         // Evento: erro na conexão
         socket.on('error', (err) => {
-            console.error('Erro no socket:', err.message);
+            sendDataGateway(ComplyStatus.CS_FAIL);
+            console.error('Erro no atuador:', err.message);
         });
 
     });
@@ -141,15 +135,41 @@ function startServer() {
 
     // Tratamento de erros gerais do servidor
     server.on('error', (err) => {
+        sendDataGateway(ComplyStatus.CS_FAIL);
         console.error('Erro no atuador:', err.message);
     });
 }
 
-function closeConnectionAtuador() {
+function sendDataGateway(complyStatus) {
+
+    if (connectionGateway != null) {
+        // Envia dados para o gateway
+        const actuatorUpdate = new ActuatorUpdate();
+        actuatorUpdate.setDeviceName(DEVICE_NAME);
+        actuatorUpdate.setState(LAMP_STATE.STATE);
+        actuatorUpdate.setMetadata(LAMP_METADATA);
+        actuatorUpdate.setTimestamp(new Date(Date.now()).toString());
+        actuatorUpdate.setIsOnline(IS_ONLINE);
+
+        // ActuatorComply -> manda uma mensagem o gateway
+        const actuatorComply = new ActuatorComply();
+        actuatorComply.setStatus(complyStatus);
+        actuatorComply.setUpdate(actuatorUpdate);
+
+        const msgResponse = actuatorComply.serializeBinary();
+
+        // Envia a mensagem para gateway
+        connectionGateway.write(msgResponse);
+    }
+}
+
+function turnOffAtuador() {
     if(server != null) {
         server.close();
     }
+}
 
+function closeConnectionGateway() {
     if(connectionGateway != null) {
         connectionGateway.end();
     }
@@ -158,5 +178,6 @@ function closeConnectionAtuador() {
 module.exports = {
   server,
   connectToGateway,
-  closeConnectionAtuador
+  turnOffAtuador,
+  closeConnectionGateway
 };

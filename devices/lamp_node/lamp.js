@@ -15,7 +15,8 @@ CONTROLLER_MULTICAST.connectToMulticast();
 process.on('SIGINT', () => {
   console.log('Desligando atuador...');
   CONTROLLER_MULTICAST.closeConnectionAtuador();
-  CONTROLLER_GATEWAY.closeConnectionAtuador();
+  CONTROLLER_GATEWAY.closeConnectionGateway();
+  CONTROLLER_GATEWAY.turnOffAtuador();
   process.exit(0);
 });
 

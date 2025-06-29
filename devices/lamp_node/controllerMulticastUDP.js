@@ -47,6 +47,8 @@ function connectToMulticast() {
       const message = Address.deserializeBinary(msg);
       const ipGateway = message.getIp();
       const portGateway = message.getPort();
+
+      console.log(`[INFO] GATEWAY : ${ipGateway}:${portGateway}`);
       
       if (ipGateway && portGateway) {
         CONTROLLER_GATEWAY.connectToGateway(ipGateway, portGateway);
@@ -56,15 +58,15 @@ function connectToMulticast() {
     // Manipulador de erros
     socket.on('error', (err) => {
       console.error('Erro no socket:', err.message);
-      CONTROLLER_GATEWAY.closeServer();
+      CONTROLLER_GATEWAY.closeConnectionGateway();
       handleReconnection();
     });
 
     socket.bind(PORT); // Associa o socket à porta
 
   } catch (err) {
-    console.error('Erro ao configurar conexão multicast:', err.message);
-    CONTROLLER_GATEWAY.closeServer();
+    console.error('Erro ao conectar no multicast:', err.message);
+    CONTROLLER_GATEWAY.closeConnectionGateway();
     handleReconnection();
   }
 }
