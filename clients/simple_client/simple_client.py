@@ -90,7 +90,7 @@ def list_sensors(args):
             reply = ClientReply()
             reply.ParseFromString(msg)
         except Exception:
-            print('[!] Error when waiting for Gateway response')
+            print('[!] Error when receiving Gateway response')
             return
     if reply.status is not ReplyStatus.RS_OK:
         print('[!] Gateway failure')
@@ -128,7 +128,7 @@ def list_actuators(args):
             reply = ClientReply()
             reply.ParseFromString(msg)
         except Exception:
-            print('[!] Error when waiting for Gateway response')
+            print('[!] Error when receiving Gateway response')
             return
     if reply.status is not ReplyStatus.RS_OK:
         print('[!] Gateway failure')
@@ -170,7 +170,7 @@ def send_action_to_actuator(args, device_name, action_name):
             reply = ClientReply()
             reply.ParseFromString(msg)
         except Exception:
-            print('[!] Error when waiting for Gateway response')
+            print('[!] Error when receiving Gateway response')
             return
     if reply.status is ReplyStatus.RS_UNKNOWN_DEVICE:
         print(f'[!] Unknown actuator with name "{device_name}"')
@@ -215,9 +215,7 @@ def send_set_state_to_actuator(args, device_name, state_key, state_value):
             reply = ClientReply()
             reply.ParseFromString(msg)
         except Exception:
-            import traceback
-            traceback.print_exc()
-            print('[!] Error when waiting for Gateway response')
+            print('[!] Error when receiving Gateway response')
             return
     if reply.status is ReplyStatus.RS_UNKNOWN_DEVICE:
         print(f'[!] Unknown actuator with name "{device_name}"')
@@ -237,6 +235,63 @@ def send_set_state_to_actuator(args, device_name, state_key, state_value):
         return
 
 
+def get_sensor_data(args, device_name):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(args.base_timeout)
+        try:
+            sock.connect(args.gateway)
+        except Exception:
+            print('[!] Could\'nt connect to Gateway')
+            return
+        try:
+            request = ClientRequest(
+                type=RequestType.RT_GET_SENSOR_DATA,
+                device_name=device_name,
+            )
+            request = request.SerializeToString()
+            sock.send(request)
+        except Exception:
+            print('[!] Error when sending request to Gateway')
+            return
+        try:
+            msg = recv_reply(sock)
+            reply = ClientReply()
+            reply.ParseFromString(msg)
+        except Exception:
+            print('[!] Error when receiving Gateway response')
+            return
+    if reply.status is ReplyStatus.RS_UNKNOWN_DEVICE:
+        print(f'[!] Unknown sensor with name "{device_name}"')
+        return
+    if reply.status is not ReplyStatus.RS_OK:
+        print('[!] Something went wrong...')
+        return
+    try:
+        data = SensorData()
+        data.ParseFromString(reply.data)
+        return data
+    except Exception:
+        print('[!] Couldn\'t undestand Gateway response')
+        return
+
+
+def print_sensor_data(data: SensorData):
+    metadata = json.loads(data.metadata)
+    print('[INFO]')
+    print('  Sensor : %s' %data.device_name)
+    print('  Status : %s' %('ONLINE' if data.is_online else 'OFFLINE'))
+    if metadata:
+        max_key_length = max(len(k) for k in metadata)
+        print('[METADATA]')
+        for key, value in metadata.items():
+            print(f'  {key.ljust(max_key_length)} : {value}')
+    if data.readings:
+        print('[DATA]')
+        for reading in data.readings:
+            print(f'  {reading.timestamp} : {reading.reading_value}')
+    print()
+
+
 def print_help(bad_command=False):
     if bad_command:
         print('[!] Command not understood', end='\n\n')
@@ -244,6 +299,8 @@ def print_help(bad_command=False):
     print('  help      : show this help message')
     print('  sensors   : list sensors devices')
     print('  actuators : list actuators devices')
+    print('  sensor <name>')
+    print('            : show all available data of sensor <name>')
     print('  actuator <name> <command>')
     print('            : send command <command> to actuator <name>')
     print('  actuator <name> <key> <value>')
@@ -268,6 +325,12 @@ def app(args):
                     print_help(True)
                 else:
                     list_actuators(args)
+            case 'sensor':
+                if len(params) == 1:
+                    data = get_sensor_data(args, params[0])
+                    print_sensor_data(data)
+                else:
+                    print_help(True)
             case 'actuator':
                 if len(params) == 2:
                     send_action_to_actuator(args, *params)
