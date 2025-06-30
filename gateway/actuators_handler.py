@@ -3,7 +3,7 @@ import time
 import socket
 import logging
 import threading
-from datetime import datetime
+from datetime import datetime, date
 from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import ActuatorUpdate, ActuatorsReport
 from messages_pb2 import CommandType, ActuatorCommand, ActuatorComply
@@ -25,16 +25,22 @@ def actuators_report_generator(args):
         with args.db_actuators_lock:
             actuators = args.db.get_actuators_summary()
             args.pending_actuators_updates.clear()
-        actuators = [
-            ActuatorUpdate(
+        today = date.today()
+        now_clock = time.monotonic()
+        tolerance = args.actuators_tolerance
+        for i, actuator in enumerate(actuators):
+            last_seen = actuator['last_seen']
+            is_online = (
+                last_seen[0] == today
+                and (now_clock - last_seen[1]) <= tolerance
+            )
+            actuators[i] = ActuatorUpdate(
                 device_name=actuator['name'],
                 state=json.dumps(actuator['state']),
                 metadata=json.dumps(actuator['metadata']),
                 timestamp=actuator['timestamp'].isoformat(),
-                is_online=actuator['is_online'],
+                is_online=is_online,
             )
-            for actuator in actuators
-        ]
         logger.debug(
             'Novo relatório gerado: %d atuadores reportados',
             len(actuators),
