@@ -152,7 +152,7 @@ def process_client_request(args, request):
                     reply_to=request.type,
                 )
             return ClientReply(
-                status=ReplyStatus.OK,
+                status=ReplyStatus.RS_OK,
                 reply_to=request.type,
                 data=update.SerializeToString(),
             )
@@ -167,6 +167,11 @@ def process_client_request(args, request):
                 args=args,
                 device_name=request.device_name,
                 action_name=request.body,
+            )
+        case _:
+            return ClientReply(
+                status=ReplyStatus.RS_FAIL,
+                reply_to=RequestType.RT_UNSPECIFIED,
             )
 
 
