@@ -5,6 +5,7 @@ import socket
 import logging
 import threading
 from datetime import datetime, UTC
+from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import Address
 from messages_pb2 import DeviceType, DeviceInfo, JoinRequest, JoinReply
@@ -205,7 +206,6 @@ def command_listener(args):
                 args.port,
             )
         except Exception as e:
-            args.stop_flag.set()
             logger.error(
                 'Erro as iniciar canal de escuta '
                 'de comandos em (%s, %s): (%s) %s',
@@ -313,6 +313,16 @@ def simulator(args):
         time.sleep(period)
 
 
+def stop_wrapper(func, stop_flag):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        finally:
+            stop_flag.set()
+    return wrapper
+
+
 def _run(args):
     logging.basicConfig(
         level=args.level,
@@ -321,25 +331,25 @@ def _run(args):
     )
     try:
         reporter = threading.Thread(
-            target=state_change_reporter, args=(args,)
+            target=stop_wrapper(state_change_reporter, args.stop_flag),
+            args=(args,)
         )
         listener = threading.Thread(
-            target=command_listener, args=(args,)
+            target=stop_wrapper(command_listener, args.stop_flag),
+            args=(args,)
         )
         discoverer = threading.Thread(
-            target=gateway_discoverer, args=(args,)
+            target=stop_wrapper(gateway_discoverer, args.stop_flag),
+            args=(args,)
         )
         reporter.start()
         listener.start()
         discoverer.start()
         simulator(args)
-    except BaseException as e:
-        args.stop_flag.set()
-        if isinstance(e, KeyboardInterrupt):
-            print('\nSHUTTING DOWN...')
-        else:
-            raise e
+    except KeyboardInterrupt:
+        print('\nSHUTTING DOWN...')
     finally:
+        args.stop_flag.set()
         discoverer.join()
         listener.join()
         reporter.join()

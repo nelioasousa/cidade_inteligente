@@ -6,6 +6,7 @@ import datetime
 import random
 import threading
 import logging
+from functools import wraps
 from messages_pb2 import Address, SensorReading
 from messages_pb2 import DeviceType, DeviceInfo, JoinRequest, JoinReply
 
@@ -128,6 +129,16 @@ def transmit_readings(args):
             time.sleep(args.report_interval)
 
 
+def stop_wrapper(func, stop_flag):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        finally:
+            stop_flag.set()
+    return wrapper
+
+
 def _run(args):
     logging.basicConfig(
         level=args.level,
@@ -135,16 +146,16 @@ def _run(args):
         format='[%(levelname)s %(asctime)s] %(name)s\n  %(message)s',
     )
     try:
-        transmiter = threading.Thread(target=transmit_readings, args=(args,))
+        transmiter = threading.Thread(
+            target=stop_wrapper(transmit_readings, args.stop_flag),
+            args=(args,)
+        )
         transmiter.start()
         gateway_discoverer(args)
-    except BaseException as e:
-        args.stop_flag.set()
-        if isinstance(e, KeyboardInterrupt):
-            print('\nSHUTTING DOWN...')
-        else:
-            raise e
+    except KeyboardInterrupt:
+        print('\nSHUTTING DOWN...')
     finally:
+        args.stop_flag.set()
         transmiter.join()
 
 

@@ -262,11 +262,8 @@ def _run(args):
     )
     try:
         connect_to_gateway(args)
-    except BaseException as e:
-        if isinstance(e, KeyboardInterrupt):
-            print('\nSHUTTING DOWN...')
-        else:
-            raise e
+    except KeyboardInterrupt:
+        print('\nSHUTTING DOWN...')
 
 
 def main():

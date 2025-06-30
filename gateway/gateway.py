@@ -58,13 +58,10 @@ def _run(args):
         sgenerator.start()
         agenerator.start()
         clients_listener(args)
-    except BaseException as e:
-        args.stop_flag.set()
-        if isinstance(e, KeyboardInterrupt):
-            print('\nSHUTTING DOWN...')
-        else:
-            raise e
+    except KeyboardInterrupt:
+        print('\nSHUTTING DOWN...')
     finally:
+        args.stop_flag.set()
         rlistener.join()
         slistener.join()
         alistener.join()
