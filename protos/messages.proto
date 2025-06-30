@@ -103,27 +103,22 @@ message ActuatorsReport {
   repeated ActuatorUpdate devices = 1;
 }
 
-message SendNextReport {}
-
-message ConnectionRequest {
-  uint32 sensors_port = 1;
-  uint32 actuators_port = 2;
-}
-
 enum RequestType {
   RT_UNSPECIFIED = 0;
-  RT_GET_SENSOR_DATA = 1;
-  RT_GET_ACTUATOR_UPDATE = 2;
-  RT_SET_ACTUATOR_STATE = 3;
-  RT_RUN_ACTUATOR_ACTION = 4;
+  RT_GET_SENSORS_REPORT = 1;
+  RT_GET_ACTUATORS_REPORT = 2;
+  RT_GET_SENSOR_DATA = 3;
+  RT_GET_ACTUATOR_UPDATE = 4;
+  RT_SET_ACTUATOR_STATE = 5;
+  RT_RUN_ACTUATOR_ACTION = 6;
 }
 
 message ClientRequest {
   RequestType type = 1;
   string device_name = 2;
   // empty
+  // OR stringfyed JSON if RequestType.RT_SET_ACTUATOR_STATE
   // OR action name if RequestType.RT_RUN_ACTUATOR_ACTION
-  // OR stringfyed JSON state if RequestType.RT_SET_ACTUATOR_STATE
   string body = 3;
 }
 
@@ -140,6 +135,8 @@ message ClientReply {
   ReplyStatus status = 1;
   RequestType reply_to = 2;
   // empty
+  // OR SensorsReport message if RequestType.RT_GET_SENSORS_REPORT
+  // OR ActuatorsReport message if RequestType.RT_GET_ACTUATORS_REPORT
   // OR SensorData message if RequestType.RT_GET_SENSOR_DATA
   // OR ActuatorUpdate message if RequestType.RT_GET_ACTUATOR_UPDATE
   bytes data = 3;
