@@ -21,7 +21,7 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const INITIAL_RECONNECT_DELAY = 1000; // 1 segundo
 const MAX_RECONNECT_DELAY = 60000; // 1 minuto
-
+let isSended = false;
 /**
  * Função para criar socket
  */
@@ -42,15 +42,12 @@ function connectToMulticast() {
 
     // Manipulador de mensagens recebidas
     socket.on('message', (msg, rinfo) => {
-      console.log(`MSG: ${msg}`);
-
       const message = Address.deserializeBinary(msg);
       const ipGateway = message.getIp();
       const portGateway = message.getPort();
-
-      console.log(`[INFO] GATEWAY : ${ipGateway}:${portGateway}`);
       
-      if (ipGateway && portGateway && CONTROLLER_GATEWAY.connectToGateway == null) {
+      if (ipGateway && portGateway && !isSended) {
+        isSended = true;
         CONTROLLER_GATEWAY.connectToGateway(ipGateway, portGateway);
       }
     });
@@ -73,6 +70,9 @@ function connectToMulticast() {
 
 // Função para lidar com a reconexão
 function handleReconnection() {
+
+  isSended = false;
+
   if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
     console.error('Número máximo de tentativas de reconexão atingido. Desligando...');
     process.exit(1);

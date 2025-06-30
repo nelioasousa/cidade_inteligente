@@ -2,18 +2,13 @@ const net = require('net');
 const protobuf = require("protobufjs");
 const { ActuatorUpdate, JoinRequest, JoinReply, DeviceType, DeviceInfo, Address, ActuatorCommand, ActuatorComply, CommandType, ComplyStatus} = require('./protos/messages_pb');
 
-/**
- * Informaçoes da conexao Cliente <> Gateway
- */
-let IS_CONNECT = false;
-
 
 /**
  * Informaçoes do atuador
  */
 const DEVICE_NAME = "LAMP";
 let LAMP_STATE = '{"isOn": "yes" ,"Color": "yellow", "Brightness": 10}';
-const LAMP_METADATA = '{"isOn": "(yes ou no)", "Color": "(yellow ou white)", "Brightness": (Between 1 and 10)", "Actions": ["turn_on", "turn_off"]}';
+const LAMP_METADATA = '{"isOn": "(yes ou no)", "Color": "(yellow ou white)", "Brightness": "(Between 1 and 10)", "Actions": ["turn_on", "turn_off"]}';
 const PORT_ATUADOR = 60555;
 const HOST_ATUADOR = '127.0.0.1';
 
@@ -22,10 +17,15 @@ const HOST_ATUADOR = '127.0.0.1';
  */
 let server = null;
 let connectionGateway = null;
+let portTrasferData = null;
+let hostTrasferData = null;
 
 function connectToGateway(ipGateway, portGateway) {
 
+    if (connectionGateway != null) return;
+
     portGatewayToConnect = portGateway;
+    hostTrasferData = ipGateway;
 
     // Criando conexao TCP com Gateway
     connectionGateway = net.createConnection({
@@ -33,16 +33,15 @@ function connectToGateway(ipGateway, portGateway) {
         port: portGatewayToConnect
     }, () => {
         console.log(`Conectado ao gateway ${ipGateway}:${portGatewayToConnect}`);
-        IS_CONNECT = true;
     });
 
     // JoinRequest para o Gateway
     const dataRegisterActuator = new DeviceInfo();
     dataRegisterActuator.setType(DeviceType.DT_ACTUATOR);
     dataRegisterActuator.setName(DEVICE_NAME);
-    dataRegisterActuator.setState(LAMP_STATE.STATE);
+    dataRegisterActuator.setState(LAMP_STATE);
     dataRegisterActuator.setMetadata(LAMP_METADATA);
-    dataRegisterActuator.setTimestamp(new Date(Date.now()).toString());
+    dataRegisterActuator.setTimestamp(new Date(Date.now()).toISOString());
 
     const address = new Address(); // porta do atuador 
     address.setIp(HOST_ATUADOR);
@@ -58,19 +57,21 @@ function connectToGateway(ipGateway, portGateway) {
     // JoinReplay do Gateway
     connectionGateway.on('data', (data) => {
         const joinReplay = JoinReply.deserializeBinary(data);
-        portGatewayToConnect = joinReplay.report_port; // porta do gateway que o atuador deve usar
+        portTrasferData = joinReplay.getReportPort(); // porta do gateway que o atuador deve usar
+        console.log(`Porta do gateway para transferencia de dados: ${portTrasferData}`);
+        connectPortTrasferData();
     });
+}
 
-    connectionGateway.end();
-
+function connectPortTrasferData() {
+    closeConnectionGateway();
     // Criando uma nova conexao TCP com o Gateway em outra porta
     connectionGateway = net.createConnection({
-        host: ipGateway,
-        port: portGatewayToConnect //50333
+        host: hostTrasferData,
+        port: portTrasferData,
     }, () => {
-        console.log(`Conectado ao gateway ${ipGateway}:${portGatewayToConnect}`);
+        console.log(`Conectado ao gateway ${hostTrasferData}:${portTrasferData}`);
     });
-
     // criando servidor atuador porta 60555
     startServer();
 }
@@ -106,7 +107,7 @@ function startServer() {
             }
             else if (actuatorCommand == CommandType.CT_SET_STATE) {
                 if (validarBody()) {
-                    LAMP_STATE.STATE = actuatorCommand.getBody();
+                    LAMP_STATE = actuatorCommand.getBody();
                     sendDataGateway(ComplyStatus.CS_OK);
                 }
                 else {
@@ -151,10 +152,10 @@ function sendDataGateway(complyStatus) {
         // Envia dados para o gateway
         const actuatorUpdate = new ActuatorUpdate();
         actuatorUpdate.setDeviceName(DEVICE_NAME);
-        actuatorUpdate.setState(LAMP_STATE.STATE);
+        actuatorUpdate.setState(LAMP_STATE);
         actuatorUpdate.setMetadata(LAMP_METADATA);
-        actuatorUpdate.setTimestamp(new Date(Date.now()).toString());
-        actuatorUpdate.setIsOnline(IS_ONLINE); // pegar do state
+        actuatorUpdate.setTimestamp(new Date(Date.now()).toISOString());
+        //actuatorUpdate.setIsOnline(false);
 
         // ActuatorComply -> manda uma mensagem o gateway
         const actuatorComply = new ActuatorComply();
@@ -177,7 +178,7 @@ function turnOffAtuador() {
 function closeConnectionGateway() {
     if(connectionGateway != null) {
         connectionGateway.end();
-        connectToGateway = null;
+        connectionGateway = null;
     }
 }
 
