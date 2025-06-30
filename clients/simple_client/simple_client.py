@@ -382,7 +382,7 @@ def main():
     )
 
     parser.add_argument(
-        '--gateway_port', type=int, default=5000,
+        '--gateway_port', type=int, default=50000,
         help='Porta do Gateway para comunicação com clientes.'
     )
 

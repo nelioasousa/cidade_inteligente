@@ -175,7 +175,7 @@ def main():
     )
 
     parser.add_argument(
-        '--multicast_port', type=int, default=12345,
+        '--multicast_port', type=int, default=50444,
         help='Porta na qual escutar por mensagens do grupo multicast.'
     )
 

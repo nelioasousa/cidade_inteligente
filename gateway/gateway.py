@@ -78,7 +78,7 @@ def main():
     parser = argparse.ArgumentParser(description='Gateway')
 
     parser.add_argument(
-        '--clients_port', type=int, default=5000,
+        '--clients_port', type=int, default=50000,
         help='Porta para comunicação com os clientes. Usa TCP.'
     )
 
@@ -103,7 +103,7 @@ def main():
     )
 
     parser.add_argument(
-        '--multicast_port', type=int, default=12345,
+        '--multicast_port', type=int, default=50444,
         help='Porta para multicast do endereço do Gateway.'
     )
 

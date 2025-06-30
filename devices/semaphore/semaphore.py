@@ -371,7 +371,7 @@ def main():
     )
 
     parser.add_argument(
-        '--port', type=int, default=5001,
+        '--port', type=int, default=60000,
         help='Porta na qual o Gateway envia comandos ao atuador.'
     )
 
@@ -381,7 +381,7 @@ def main():
     )
 
     parser.add_argument(
-        '--multicast_port', type=int, default=12345,
+        '--multicast_port', type=int, default=50444,
         help='Porta na qual escutar por mensagens do grupo multicast.'
     )
 
