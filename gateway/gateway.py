@@ -7,6 +7,17 @@ from registration_handler import multicast_location, registration_listener
 from sensors_handler import sensors_listener, sensors_report_generator
 from actuators_handler import actuators_listener, actuators_report_generator
 from clients_handler import clients_listener
+from functools import wraps
+
+
+def stop_wrapper(func, stop_flag):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        finally:
+            stop_flag.set()
+    return wrapper
 
 
 def _run(args):
@@ -17,22 +28,28 @@ def _run(args):
     )
     try:
         rlistener = threading.Thread(
-            target=registration_listener, args=(args,)
+            target=stop_wrapper(registration_listener, args.stop_flag),
+            args=(args,)
         )
         slistener = threading.Thread(
-            target=sensors_listener, args=(args,)
+            target=stop_wrapper(sensors_listener, args.stop_flag),
+            args=(args,)
         )
         alistener = threading.Thread(
-            target=actuators_listener, args=(args,)
+            target=stop_wrapper(actuators_listener, args.stop_flag),
+            args=(args,)
         )
         multicaster = threading.Thread(
-            target=multicast_location, args=(args,)
+            target=stop_wrapper(multicast_location, args.stop_flag),
+            args=(args,)
         )
         sgenerator = threading.Thread(
-            target=sensors_report_generator, args=(args,)
+            target=stop_wrapper(sensors_report_generator, args.stop_flag),
+            args=(args,)
         )
         agenerator = threading.Thread(
-            target=actuators_report_generator, args=(args,)
+            target=stop_wrapper(actuators_report_generator, args.stop_flag),
+            args=(args,)
         )
         rlistener.start()
         slistener.start()

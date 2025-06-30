@@ -44,7 +44,6 @@ def sensors_listener(args):
         try:
             sock.bind(('', args.sensors_port))
         except Exception as e:
-            args.stop_flag.set()
             logger.error(
                 'Erro ao tentar vínculo com a porta %s: (%s) %s',
                 args.sensors_port,
@@ -64,9 +63,6 @@ def sensors_listener(args):
                 reading.ParseFromString(msg)
             except TimeoutError:
                 continue
-            except:
-                args.stop_flag.set()
-                raise
             logger.debug(
                 'Leitura de sensor recebida: (%s, %s, %.6f)',
                 reading.timestamp,

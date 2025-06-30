@@ -22,7 +22,6 @@ def multicast_location(args):
             try:
                 sock.sendto(addrs, (args.multicast_ip, args.multicast_port))
             except Exception as e:
-                args.stop_flag.set()
                 logger.error(
                     'Erro ao enviar mensagem para o grupo multicast: (%s) %s',
                     type(e).__name__,
@@ -86,12 +85,8 @@ def registration_listener(args):
     logger = logging.getLogger('REGISTRATION_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            sock.bind(('', args.registration_port))
-            sock.listen()
-        except:
-            args.stop_flag.set()
-            raise
+        sock.bind(('', args.registration_port))
+        sock.listen()
         logger.info(
             'Escutando por requisições de registro em (%s, %s)',
             args.host_ip,
@@ -104,13 +99,9 @@ def registration_listener(args):
                     conn, _ = sock.accept()
                 except TimeoutError:
                     continue
-                except:
-                    args.stop_flag.set()
-                    raise
                 try:
                     executor.submit(registration_handler, args, conn)
                 except:
-                    args.stop_flag.set()
                     conn.shutdown(socket.SHUT_RDWR)
                     conn.close()
                     raise
