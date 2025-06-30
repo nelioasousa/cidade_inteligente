@@ -32,10 +32,9 @@ def sensors_report_generator(args):
             'Novo relatório gerado: %d sensores reportados',
             len(sensors),
         )
-        report = SensorsReport(devices=sensors)
-        report = report.SerializeToString()
+        report = SensorsReport(devices=sensors).SerializeToString()
         with args.db_sensors_report_lock:
-            args.db.att_sensors_report(report)
+            args.db.sensors_report = report
         time.sleep(args.sensors_gen_interval)
 
 

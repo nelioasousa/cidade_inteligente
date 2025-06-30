@@ -4,6 +4,7 @@ import pickle
 import datetime
 from copy import deepcopy
 from sortedcontainers import SortedList
+from messages_pb2 import SensorsReport, ActuatorsReport
 
 
 class Database:
@@ -26,8 +27,8 @@ class Database:
                     self.devices[1][name]['is_online'] = False
         else:
             self.devices = ({}, {})
-        self.sensors_report = (0, None)
-        self.actuators_report = (0, None)
+        self.sensors_report = SensorsReport(devices=[]).SerializeToString()
+        self.actuators_report = ActuatorsReport(devices=[]).SerializeToString()
 
     def register_sensor(self, name, address, metadata):
         sensor = self.devices[0].setdefault(name, {'name': name})
@@ -44,12 +45,6 @@ class Database:
         actuator['timestamp'] = timestamp
         actuator['is_online'] = True
         actuator['last_seen'] = (datetime.date.today(), time.monotonic())
-
-    def att_sensors_report(self, report):
-        self.sensors_report = (self.sensors_report[0] + 1, report)
-
-    def att_actuators_report(self, report):
-        self.actuators_report = (self.actuators_report[0] + 1, report)
 
     def persist(self):
         with open(self.db_file, mode='bw') as db:

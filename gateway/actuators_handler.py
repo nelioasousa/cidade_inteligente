@@ -33,9 +33,9 @@ def actuators_report_generator(args):
             'Novo relatório gerado: %d atuadores reportados',
             len(actuators),
         )
-        report_msg = ActuatorsReport(devices=actuators).SerializeToString()
+        report = ActuatorsReport(devices=actuators).SerializeToString()
         with args.db_actuators_report_lock:
-            args.db.att_actuators_report(report_msg)
+            args.db.actuators_report = report
 
 
 def build_command_message(type, body):
