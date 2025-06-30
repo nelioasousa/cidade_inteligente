@@ -243,7 +243,7 @@ def state_change_reporter(args):
         transmission_addrs = (args.gateway_ip, args.transmission_port)
         if transmission_addrs[0] is None:
             logger.info('Transmissão interrompida. Sem conexão com o Gateway')
-            time.sleep(1.0)
+            time.sleep(2.0)
             continue
         if not args.state_change.is_set():
             time.sleep(1.0)
@@ -259,6 +259,7 @@ def state_change_reporter(args):
                     type(e).__name__,
                     e,
                 )
+                time.sleep(2.0)
                 continue
             try:
                 with args.state_lock:

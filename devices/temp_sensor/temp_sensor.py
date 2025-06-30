@@ -115,7 +115,7 @@ def transmit_readings(args):
         while not args.stop_flag.is_set():
             if args.gateway_ip is None:
                 logger.info('Transmissão interrompida. Sem conexão com o Gateway')
-                time.sleep(1.0)
+                time.sleep(2.0)
                 continue
             reading = SensorReading(
                 device_name=args.name,
