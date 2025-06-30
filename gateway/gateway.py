@@ -1,4 +1,5 @@
 import sys
+import time
 import socket
 import threading
 import logging
@@ -6,7 +7,7 @@ from db import Database
 from registration_handler import multicast_location, registration_listener
 from sensors_handler import sensors_listener, sensors_report_generator
 from actuators_handler import actuators_listener, actuators_report_generator
-from clients_handler import clients_listener
+# from clients_handler import clients_listener
 from functools import wraps
 
 
@@ -57,7 +58,9 @@ def _run(args):
         multicaster.start()
         sgenerator.start()
         agenerator.start()
-        clients_listener(args)
+        # clients_listener(args)
+        while not args.stop_flag.is_set():
+            time.sleep(10.0)
     except KeyboardInterrupt:
         print('\nSHUTTING DOWN...')
     finally:
@@ -129,6 +132,8 @@ def main():
 
     # Timeouts
     args.base_timeout = 1.0
+    args.cautious_timeout = 5.0
+    args.generous_timeout = 120.0
     args.client_timeout = None
     args.actuators_timeout = None
     args.reports_timeout = None
