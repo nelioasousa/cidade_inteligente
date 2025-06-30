@@ -61,8 +61,9 @@ def gateway_discoverer(args):
 
 
 def disconnect_device(args):
-    args.gateway_ip = None
-    args.transmission_port = None
+    with args.connection_lock:
+        args.gateway_ip = None
+        args.transmission_port = None
     return
 
 
@@ -93,10 +94,9 @@ def try_to_register(args, address, logger):
                 e,
             )
             return
-        finally:
-            sock.shutdown(socket.SHUT_RDWR)
-    args.gateway_ip = address[0]
-    args.transmission_port = join_reply.report_port
+    with args.connection_lock:
+        args.gateway_ip = address[0]
+        args.transmission_port = join_reply.report_port
     logger.info('Registro bem-sucedido com o Gateway em %s', address[0])
     return
 
@@ -113,7 +113,9 @@ def transmit_readings(args):
     logger.info('Começando a transmissão de leituras para o Gateway')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         while not args.stop_flag.is_set():
-            if args.gateway_ip is None:
+            with args.connection_lock:
+                addrs = (args.gateway_ip, args.transmission_port)
+            if addrs[0] is None:
                 logger.info('Transmissão interrompida. Sem conexão com o Gateway')
                 time.sleep(2.0)
                 continue
@@ -123,7 +125,6 @@ def transmit_readings(args):
                 timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
                 metadata=json.dumps(args.metadata),
             )
-            addrs = (args.gateway_ip, args.transmission_port)
             sock.sendto(reading.SerializeToString(), addrs)
             logger.debug('Leitura de temperatura enviada para %s', addrs)
             time.sleep(args.report_interval)
@@ -236,8 +237,9 @@ def main():
         'Location': {'Latitude': -3.733486, 'Longitude': -38.570860},
     }
 
-    # Events
+    # Events and locks
     args.stop_flag = threading.Event()
+    args.connection_lock = threading.Lock()
 
     return _run(args)
 

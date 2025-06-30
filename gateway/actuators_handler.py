@@ -2,7 +2,6 @@ import json
 import time
 import socket
 import logging
-import threading
 from datetime import datetime, date
 from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import ActuatorUpdate, ActuatorsReport
@@ -70,15 +69,13 @@ def send_actuator_command(args, actuator_name, command_type, command_body):
     if address is None:
         return None
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(args.base_timeout)
         try:
+            sock.settimeout(args.base_timeout)
             sock.connect(address)
             sock.send(command)
             msg = sock.recv(1024)
         except Exception:
             msg = None
-        finally:
-            sock.shutdown(socket.SHUT_RDWR)
     if msg is None:
         with args.db_actuators_lock:
             args.db.mark_actuator_as_offline(actuator_name)
@@ -100,9 +97,9 @@ def send_actuator_command(args, actuator_name, command_type, command_body):
     return reply
 
 
-def actuator_handler(args, sock):
-    logger = logging.getLogger(f'ACTUATOR_HANLDER_{threading.get_ident()}')
+def actuator_handler(args, sock, address):
     try:
+        logger = logging.getLogger(f'ACTUATOR_HANLDER_{address}')
         msg = sock.recv(1024)
         update = ActuatorUpdate()
         update.ParseFromString(msg)
@@ -145,6 +142,7 @@ def actuator_handler(args, sock):
 def actuators_listener(args):
     logger = logging.getLogger('ACTUATORS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(('', args.actuators_port))
         sock.listen()
         logger.info(
@@ -156,7 +154,7 @@ def actuators_listener(args):
         with ThreadPoolExecutor(max_workers=5) as executor:
             while not args.stop_flag.is_set():
                 try:
-                    conn, _ = sock.accept()
+                    conn, addrs = sock.accept()
                 except TimeoutError:
                     continue
                 except Exception as e:
@@ -167,7 +165,7 @@ def actuators_listener(args):
                     )
                     continue
                 try:
-                    executor.submit(actuator_handler, args, conn)
+                    executor.submit(actuator_handler, args, conn, addrs)
                 except:
                     conn.shutdown(socket.SHUT_RDWR)
                     conn.close()

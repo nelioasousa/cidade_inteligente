@@ -2,7 +2,6 @@ import time
 import json
 import socket
 import logging
-from threading import get_ident
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import Address, JoinRequest, JoinReply, DeviceType
@@ -31,9 +30,9 @@ def multicast_location(args):
             time.sleep(args.multicast_interval)
 
 
-def registration_handler(args, sock):
+def registration_handler(args, sock, address):
     try:
-        logger = logging.getLogger(f'REGISTRATION_HANDLER_{get_ident()}')
+        logger = logging.getLogger(f'REGISTRATION_HANDLER_{address}')
         logger.info('Processando requisição de registro')
         msg = sock.recv(1024)
         request = JoinRequest()
@@ -96,11 +95,11 @@ def registration_listener(args):
         with ThreadPoolExecutor(max_workers=5) as executor:
             while not args.stop_flag.is_set():
                 try:
-                    conn, _ = sock.accept()
+                    conn, addrs = sock.accept()
                 except TimeoutError:
                     continue
                 try:
-                    executor.submit(registration_handler, args, conn)
+                    executor.submit(registration_handler, args, conn, addrs)
                 except:
                     conn.shutdown(socket.SHUT_RDWR)
                     conn.close()

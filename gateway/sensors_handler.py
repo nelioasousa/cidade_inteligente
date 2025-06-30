@@ -41,6 +41,7 @@ def sensors_report_generator(args):
 def sensors_listener(args):
     logger = logging.getLogger('SENSORS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             sock.bind(('', args.sensors_port))
         except Exception as e:

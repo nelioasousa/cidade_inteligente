@@ -65,8 +65,9 @@ def gateway_discoverer(args):
 
 
 def disconnect_device(args):
-    args.gateway_ip = None
-    args.transmission_port = None
+    with args.connection_lock:
+        args.gateway_ip = None
+        args.transmission_port = None
     return
 
 
@@ -102,10 +103,9 @@ def try_to_register(args, address, logger):
                 e,
             )
             return
-        finally:
-            sock.shutdown(socket.SHUT_RDWR)
-    args.gateway_ip = address[0]
-    args.transmission_port = join_reply.report_port
+    with args.connection_lock:
+        args.gateway_ip = address[0]
+        args.transmission_port = join_reply.report_port
     logger.info('Registro bem-sucedido com o Gateway em %s', address[0])
     return
 
@@ -242,7 +242,9 @@ def state_change_reporter(args):
     logger.info('Iniciando thread de divulgação de atualizações')
     idle_time = 0
     while not args.stop_flag.is_set():
-        if args.gateway_ip is None:
+        with args.connection_lock:
+            transmission_addrs = (args.gateway_ip, args.transmission_port)
+        if transmission_addrs[0] is None:
             logger.info('Transmissão interrompida. Sem conexão com o Gateway')
             time.sleep(2.0)
             continue
@@ -251,10 +253,9 @@ def state_change_reporter(args):
             idle_time += 1
             continue
         idle_time = 0
-        transmission_addrs = (args.gateway_ip, args.transmission_port)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(args.base_timeout)
             try:
+                sock.settimeout(args.base_timeout)
                 sock.connect(transmission_addrs)
             except Exception as e:
                 logger.error(
@@ -285,8 +286,6 @@ def state_change_reporter(args):
                     e,
                 )
                 continue
-            finally:
-                sock.shutdown(socket.SHUT_RDWR)
 
 
 def phase_generator(args):
@@ -435,6 +434,7 @@ def main():
     # Events and locks
     args.stop_flag = threading.Event()
     args.state_change = threading.Event()
+    args.connection_lock = threading.Lock()
     args.state_lock = threading.Lock()
 
     return _run(args)

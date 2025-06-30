@@ -91,12 +91,13 @@ class Database:
             actuator = self.data.actuators[name]
         except KeyError:
             return False
-        if timestamp > actuator['timestamp']:
-            actuator['state'] = state
-            actuator['metadata'] = metadata
-            actuator['timestamp'] = timestamp
-            actuator['is_online'] = True
-            actuator['last_seen'] = (datetime.date.today(), time.monotonic())
+        if timestamp < actuator['timestamp']:
+            return False
+        actuator['state'] = state
+        actuator['metadata'] = metadata
+        actuator['timestamp'] = timestamp
+        actuator['is_online'] = True
+        actuator['last_seen'] = (datetime.date.today(), time.monotonic())
         return True
 
     def mark_actuator_as_offline(self, name):

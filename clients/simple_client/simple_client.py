@@ -1,8 +1,6 @@
 import sys
 import json
-import time
 import socket
-import threading
 import logging
 from struct import unpack
 from messages_pb2 import ActuatorUpdate
@@ -60,7 +58,7 @@ def print_sensor_data(data: SensorData):
     if data.readings:
         print('[DATA]')
         for reading in data.readings:
-            print(f'  {reading.timestamp} : {reading.reading_value}')
+            print(f'  {reading.timestamp} : {reading.reading_value:.4f}')
     print()
 
 
@@ -319,6 +317,9 @@ def print_help(bad_command=False):
 def app(args):
     while True:
         command = input('>>> ').strip()
+        if not command:
+            print_help()
+            continue
         command, *params = command.split()
         command = command.lower()
         match command:
@@ -341,7 +342,8 @@ def app(args):
             case 'sensor':
                 if len(params) == 1:
                     data = get_sensor_data(args, params[0])
-                    print_sensor_data(data)
+                    if data is not None:
+                        print_sensor_data(data)
                 else:
                     print_help(True)
             case 'actuator':

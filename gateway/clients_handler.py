@@ -184,6 +184,7 @@ def frame_message(message):
 def client_handler(args, sock, address):
     try:
         logger = logging.getLogger(f'CLIENT_HANDLER_{address}')
+        logger.info('Tratando requisição de um cliente em %s', address)
         try:
             msg = sock.recv(1024)
             request = ClientRequest()

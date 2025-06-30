@@ -1,5 +1,4 @@
 import sys
-import time
 import socket
 import threading
 import logging
@@ -139,7 +138,7 @@ def main():
     args.stop_flag = threading.Event()
 
     # Reports
-    args.reports_gen_interval = 10
+    args.reports_gen_interval = 5
 
     # Sensors utilities
     args.sensors_tolerance = 10.0
@@ -147,7 +146,7 @@ def main():
     args.db_sensors_report_lock = threading.Lock()
 
     # Actuators utilities
-    args.actuators_tolerance = 15.0
+    args.actuators_tolerance = 60.0
     args.pending_actuators_updates = threading.Event()
     args.pending_actuators_updates.set()
     args.db_actuators_lock = threading.Lock()
