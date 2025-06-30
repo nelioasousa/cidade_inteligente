@@ -22,11 +22,13 @@ def multicast_location(args):
             try:
                 sock.sendto(addrs, (args.multicast_ip, args.multicast_port))
             except Exception as e:
+                args.stop_flag.set()
                 logger.error(
                     'Erro ao enviar mensagem para o grupo multicast: (%s) %s',
                     type(e).__name__,
                     e,
                 )
+                raise e
             time.sleep(args.multicast_interval)
 
 
