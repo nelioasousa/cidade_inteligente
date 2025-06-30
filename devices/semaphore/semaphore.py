@@ -240,15 +240,18 @@ def command_listener(args):
 def state_change_reporter(args):
     logger = logging.getLogger('STATE_CHANGE_REPORTER')
     logger.info('Iniciando thread de divulgação de atualizações')
+    idle_time = 0
     while not args.stop_flag.is_set():
-        transmission_addrs = (args.gateway_ip, args.transmission_port)
-        if transmission_addrs[0] is None:
+        if args.gateway_ip is None:
             logger.info('Transmissão interrompida. Sem conexão com o Gateway')
             time.sleep(2.0)
             continue
-        if not args.state_change.is_set():
+        if not args.state_change.is_set() and idle_time < args.update_interval:
             time.sleep(1.0)
+            idle_time += 1
             continue
+        idle_time = 0
+        transmission_addrs = (args.gateway_ip, args.transmission_port)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.settimeout(args.base_timeout)
             try:
@@ -407,6 +410,9 @@ def main():
 
     # Host IP
     args.host_ip = socket.gethostbyname(socket.gethostname())
+
+    # Send update after `update_interval` secs without communication
+    args.update_interval = 10
 
     # Gateway
     args.gateway_ip = None

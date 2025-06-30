@@ -12,11 +12,16 @@ from messages_pb2 import CommandType, ActuatorCommand, ActuatorComply
 def actuators_report_generator(args):
     logger = logging.getLogger('ACTUATORS_REPORT_GENERATOR')
     logger.info('Iniciando o gerador de relatórios dos atuadores')
+    idle_time = 0
     while not args.stop_flag.is_set():
-        for _ in range(args.reports_gen_interval):
-            if args.pending_actuators_updates.is_set():
-                break
+        if (
+            not args.pending_actuators_updates.is_set()
+            and idle_time < args.reports_gen_interval
+        ):
             time.sleep(1.0)
+            idle_time += 1
+            continue
+        idle_time = 0
         with args.db_actuators_lock:
             actuators = args.db.get_actuators_summary()
             args.pending_actuators_updates.clear()
