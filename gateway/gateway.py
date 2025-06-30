@@ -58,7 +58,9 @@ def _run(args):
         multicaster.start()
         sgenerator.start()
         agenerator.start()
-        clients_listener(args)
+        while True:
+            time.sleep(10.0)
+        # clients_listener(args)
     except KeyboardInterrupt:
         print('\nSHUTTING DOWN...')
     finally:
