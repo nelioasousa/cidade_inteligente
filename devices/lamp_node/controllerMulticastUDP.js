@@ -50,7 +50,7 @@ function connectToMulticast() {
 
       console.log(`[INFO] GATEWAY : ${ipGateway}:${portGateway}`);
       
-      if (ipGateway && portGateway) {
+      if (ipGateway && portGateway && CONTROLLER_GATEWAY.connectToGateway == null) {
         CONTROLLER_GATEWAY.connectToGateway(ipGateway, portGateway);
       }
     });

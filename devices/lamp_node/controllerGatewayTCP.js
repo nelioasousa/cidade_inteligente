@@ -3,19 +3,20 @@ const protobuf = require("protobufjs");
 const { ActuatorUpdate, JoinRequest, JoinReply, DeviceType, DeviceInfo, Address, ActuatorCommand, ActuatorComply, CommandType, ComplyStatus} = require('./protos/messages_pb');
 
 /**
- * Informaçoes do Cliente <> Gateway
+ * Informaçoes da conexao Atuador <> Gateway
  */
+let IS_CONNECT = false;
 
-let IS_ONLINE = false;
 
 /**
  * Informaçoes do atuador
  */
 const DEVICE_NAME = "LAMP";
-let LAMP_STATE = '{"isOn": "yes", "Color": "yellow", "Brightness": 10}';
+let LAMP_STATE = '{"Color": "yellow", "Brightness": 10}';
 const LAMP_METADATA = '{"isOn": "(yes ou no)", "Color": "(yellow ou white)", "Brightness": (Between 1 and 10)"}';
 const PORT_ATUADOR = 60555;
 const HOST_ATUADOR = '127.0.0.1';
+let LAMP_ACTION = '{"Color": "yellow", "Brightness": 10}';
 
 /**
  * Variavel servidor TCP
@@ -33,6 +34,7 @@ function connectToGateway(ipGateway, portGateway) {
         port: portGatewayToConnect
     }, () => {
         console.log(`Conectado ao gateway ${ipGateway}:${portGatewayToConnect}`);
+        IS_CONNECT = true;
     });
 
     // JoinRequest para o Gateway
@@ -88,10 +90,12 @@ function startServer() {
                 sendDataGateway(ComplyStatus.CS_OK);
             } else if (actuatorCommand == CommandType.CT_ACTION) {
                 if (actuatorCommand.getBody().toLowerCase() == "off") {
+                    //colocar no json state
                     IS_ONLINE = false;
                     sendDataGateway(ComplyStatus.CS_OK);
                 }
                 else if (actuatorCommand.getBody().toLowerCase() == "on") {
+                    //colocar no json state
                     IS_ONLINE = true;
                     sendDataGateway(ComplyStatus.CS_OK);
                 }
@@ -149,7 +153,7 @@ function sendDataGateway(complyStatus) {
         actuatorUpdate.setState(LAMP_STATE.STATE);
         actuatorUpdate.setMetadata(LAMP_METADATA);
         actuatorUpdate.setTimestamp(new Date(Date.now()).toString());
-        actuatorUpdate.setIsOnline(IS_ONLINE);
+        actuatorUpdate.setIsOnline(IS_ONLINE); // pegar do state
 
         // ActuatorComply -> manda uma mensagem o gateway
         const actuatorComply = new ActuatorComply();
@@ -172,6 +176,7 @@ function turnOffAtuador() {
 function closeConnectionGateway() {
     if(connectionGateway != null) {
         connectionGateway.end();
+        connectToGateway = null;
     }
 }
 
