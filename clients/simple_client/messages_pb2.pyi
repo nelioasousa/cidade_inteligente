@@ -31,6 +31,8 @@ class ComplyStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
 class RequestType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     RT_UNSPECIFIED: _ClassVar[RequestType]
+    RT_GET_SENSORS_REPORT: _ClassVar[RequestType]
+    RT_GET_ACTUATORS_REPORT: _ClassVar[RequestType]
     RT_GET_SENSOR_DATA: _ClassVar[RequestType]
     RT_GET_ACTUATOR_UPDATE: _ClassVar[RequestType]
     RT_SET_ACTUATOR_STATE: _ClassVar[RequestType]
@@ -57,6 +59,8 @@ CS_FAIL: ComplyStatus
 CS_UNKNOWN_ACTION: ComplyStatus
 CS_INVALID_STATE: ComplyStatus
 RT_UNSPECIFIED: RequestType
+RT_GET_SENSORS_REPORT: RequestType
+RT_GET_ACTUATORS_REPORT: RequestType
 RT_GET_SENSOR_DATA: RequestType
 RT_GET_ACTUATOR_UPDATE: RequestType
 RT_SET_ACTUATOR_STATE: RequestType
@@ -178,18 +182,6 @@ class ActuatorsReport(_message.Message):
     DEVICES_FIELD_NUMBER: _ClassVar[int]
     devices: _containers.RepeatedCompositeFieldContainer[ActuatorUpdate]
     def __init__(self, devices: _Optional[_Iterable[_Union[ActuatorUpdate, _Mapping]]] = ...) -> None: ...
-
-class SendNextReport(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
-
-class ConnectionRequest(_message.Message):
-    __slots__ = ("sensors_port", "actuators_port")
-    SENSORS_PORT_FIELD_NUMBER: _ClassVar[int]
-    ACTUATORS_PORT_FIELD_NUMBER: _ClassVar[int]
-    sensors_port: int
-    actuators_port: int
-    def __init__(self, sensors_port: _Optional[int] = ..., actuators_port: _Optional[int] = ...) -> None: ...
 
 class ClientRequest(_message.Message):
     __slots__ = ("type", "device_name", "body")
