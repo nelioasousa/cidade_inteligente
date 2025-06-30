@@ -4,183 +4,11 @@ import time
 import socket
 import threading
 import logging
-from functools import wraps
-from copy import deepcopy
-from messages_pb2 import SensorsReport, ActuatorsReport, SendNextReport
-from messages_pb2 import ConnectionRequest
-from messages_pb2 import SensorReading, ActuatorUpdate
-
-
-def att_sensors_report(args, report):
-    with args.sensors_report_lock:
-        args.sensors_report = (args.sensors_report[0] + 1, report)
-
-
-def att_actuators_report(args, report):
-    with args.actuators_report_lock:
-        args.actuators_report = (args.actuators_report[0] + 1, report)
-
-
-def sensors_report_listener(args):
-    logger = logging.getLogger('SENSORS_REPORT')
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(('', args.sensors_port))
-        sock.listen()
-        logger.info(
-            'Esperando relatório dos sensores na porta %d',
-            args.sensors_port,
-        )
-        sock.settimeout(args.base_timeout)
-        while not args.stop_flag.is_set():
-            args.receiving_sensors_data.clear()
-            try:
-                conn, _ = sock.accept()
-                conn.settimeout(args.report_timeout)
-                logger.info('Conexão com o Gateway aceita')
-            except TimeoutError:
-                logger.info('Gateway não solicitou conexão em tempo hábil')
-                time.sleep(2.0)
-                continue
-            except Exception as e:
-                logger.error(
-                    'Erro ao aceitar conexão com o Gateway: (%s) %s',
-                    type(e).__name__,
-                    e,
-                )
-                raise e
-            with conn:
-                args.receiving_sensors_data.set()
-                send_next_report = SendNextReport().SerializeToString()
-                while not args.stop_flag.is_set():
-                    try:
-                        msg = conn.recv(1024)
-                    except Exception as e:
-                        logger.error(
-                            'Erro ao receber relatório: (%s) %s',
-                            type(e).__name__,
-                            e,
-                        )
-                        break
-                    report = SensorsReport()
-                    report.ParseFromString(msg)
-                    att_sensors_report(args, report)
-                    try:
-                        conn.send(send_next_report)
-                    except Exception as e:
-                        logger.error(
-                            'Erro ao solicitar novo relatório: (%s) %s',
-                            type(e).__name__,
-                            e,
-                        )
-                        break
-
-
-def actuators_report_listener(args):
-    logger = logging.getLogger('ACTUATORS_REPORT')
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(('', args.actuators_port))
-        sock.listen()
-        logger.info(
-            'Esperando relatórios dos atuadores na porta %d',
-            args.actuators_port,
-        )
-        sock.settimeout(args.base_timeout)
-        while not args.stop_flag.is_set():
-            args.receiving_actuators_data.clear()
-            try:
-                conn, _ = sock.accept()
-                conn.settimeout(args.report_timeout)
-                logger.info('Conexão com o Gateway aceita')
-            except TimeoutError:
-                logger.info('Gateway não solicitou conexão em tempo hábil')
-                time.sleep(2.0)
-                continue
-            except Exception as e:
-                logger.error(
-                    'Erro ao aceitar conexão com o Gateway: (%s) %s',
-                    type(e).__name__,
-                    e,
-                )
-                raise e
-            with conn:
-                args.receiving_actuators_data.set()
-                send_next_report = SendNextReport().SerializeToString()
-                while not args.stop_flag.is_set():
-                    try:
-                        msg = conn.recv(1024)
-                    except Exception as e:
-                        logger.error(
-                            'Erro ao receber relatório: (%s) %s',
-                            type(e).__name__,
-                            e,
-                        )
-                        break
-                    report = ActuatorsReport()
-                    report.ParseFromString(msg)
-                    att_actuators_report(args, report)
-                    try:
-                        conn.send(send_next_report)
-                    except Exception as e:
-                        logger.error(
-                            'Erro ao solicitar novo relatório: (%s) %s',
-                            type(e).__name__,
-                            e,
-                        )
-                        break
-
-
-def disconnect_gateway(args):
-    with args.connection_lock:
-        args.connection = None
-        args.gateway_connected.clear()
-
-
-def gateway_connector(args):
-    logger = logging.getLogger('GATEWAY_CONNECTOR')
-    connection_message = ConnectionRequest(
-        sensors_port=args.sensors_port, actuators_port=args.actuators_port,
-    ).SerializeToString()
-    args.gateway_connected.clear()
-    while not args.stop_flag.is_set():
-        disconnect_gateway(args)
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(args.base_timeout)
-            try:
-                sock.connect((args.gateway_ip, args.gateway_port))
-            except Exception as e:
-                logger.info('Não foi possível se conectar ao Gateway')
-                time.sleep(2.0)
-                continue
-            try:
-                sock.send(connection_message)
-                logger.info('Conexão com o Gateway foi bem-sucedida')
-                with args.connection_lock:
-                    args.gateway_connected.set()
-                    args.connection = sock
-            except Exception as e:
-                logger.error(
-                    'Erro durante o envio da requisição de conexão: (%s) %s',
-                    type(e).__name__,
-                    e,
-                )
-                continue
-            while (
-                not args.stop_flag.is_set()
-                and args.gateway_connected.is_set()
-            ):
-                time.sleep(1.0)
-                continue
-
-
-def print_help():
-    print('The following commands are available:')
-    print('  help      : show this help message')
-    print('  sensors   : list sensors devices')
-    print('  actuators : list actuators devices')
-    print('  actuator <name> <command>')
-    print('            : send command <command> to actuator <name>')
-    print('  actuator <name> <key> <value>')
-    print('            : set state <key> to <value> for actuator <name>', end='\n\n')
+from struct import unpack
+from messages_pb2 import SensorsReport, ActuatorsReport
+from messages_pb2 import RequestType, ClientRequest
+from messages_pb2 import ReplyStatus, ClientReply
+from messages_pb2 import ActuatorUpdate, SensorData
 
 
 def print_sensor_summary(sensor):
@@ -194,7 +22,7 @@ def print_sensor_summary(sensor):
         max_key_length = max(len(k) for k in metadata)
         print('[METADATA]')
         for key, value in metadata.items():
-            print(f' {key.rjust(max_key_length)} : {value}')
+            print(f' {key.ljust(max_key_length)} : {value}')
     print()
 
 
@@ -218,52 +46,237 @@ def print_actuator_summary(actuator):
     print()
 
 
-def print_sensors(args):
-    with args.sensors_report_lock:
-        sensors = deepcopy(args.sensors_report[1])
-    if sensors is None:
-        print('Nenhum relatório foi fornecido.')
+def recv_exaclty(sock, n, timeout_tolerance=3):
+    msg_chunks = []
+    remaining = n
+    while remaining:
+        try:
+            chunk = sock.recv(remaining)
+        except TimeoutError as e:
+            if timeout_tolerance < 1:
+                raise e
+            timeout_tolerance -= 1
+            continue
+        if not chunk:
+            raise EOFError('Socket closed before receiving all expected data')
+        msg_chunks.append(chunk)
+        remaining -= len(chunk)
+    return b''.join(msg_chunks)
+
+
+def recv_reply(sock):
+    msg_size = recv_exaclty(sock, 4)
+    msg_size = unpack('!I', msg_size)[0]
+    return recv_exaclty(sock, msg_size)
+
+
+def list_sensors(args):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(args.base_timeout)
+        try:
+            sock.connect(args.gateway)
+        except Exception:
+            print('[!] Could\'nt connect to Gateway')
+            return
+        try:
+            request = ClientRequest(type=RequestType.RT_GET_SENSORS_REPORT)
+            request = request.SerializeToString()
+            sock.send(request)
+        except Exception:
+            print('[!] Error when sending request to Gateway')
+            return
+        try:
+            msg = recv_reply(sock)
+            reply = ClientReply()
+            reply.ParseFromString(msg)
+        except Exception:
+            print('[!] Error when waiting for Gateway response')
+            return
+    if reply.status is not ReplyStatus.RS_OK:
+        print('[!] Gateway failure')
         return
-    if not sensors.devices:
-        print('Nenhum sensor para listar.')
+    try:
+        report = SensorsReport()
+        report.ParseFromString(reply.data)
+    except Exception:
+        print('[!] Couldn\'t undestand Gateway response')
         return
-    for sensor in sensors.devices:
+    if not report.devices:
+        print('No sensors to report')
+        return
+    for sensor in report.devices:
         print_sensor_summary(sensor)
 
 
-def print_actuators(args):
-    with args.actuators_report_lock:
-        actuators = deepcopy(args.actuators_report[1])
-    if actuators is None:
-        print('Nenhum relatório foi fornecido.')
+def list_actuators(args):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(args.base_timeout)
+        try:
+            sock.connect(args.gateway)
+        except Exception:
+            print('[!] Could\'nt connect to Gateway')
+            return
+        try:
+            request = ClientRequest(type=RequestType.RT_GET_ACTUATORS_REPORT)
+            request = request.SerializeToString()
+            sock.send(request)
+        except Exception:
+            print('[!] Error when sending request to Gateway')
+            return
+        try:
+            msg = recv_reply(sock)
+            reply = ClientReply()
+            reply.ParseFromString(msg)
+        except Exception:
+            print('[!] Error when waiting for Gateway response')
+            return
+    if reply.status is not ReplyStatus.RS_OK:
+        print('[!] Gateway failure')
         return
-    if not actuators.devices:
-        print('Nenhum atuador para listar.')
+    try:
+        report = ActuatorsReport()
+        report.ParseFromString(reply.data)
+    except Exception:
+        print('[!] Couldn\'t undestand Gateway response')
         return
-    for actuator in actuators.devices:
+    if not report.devices:
+        print('No actuators to report')
+        return
+    for actuator in report.devices:
         print_actuator_summary(actuator)
 
 
+def send_action_to_actuator(args, device_name, action_name):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(args.base_timeout)
+        try:
+            sock.connect(args.gateway)
+        except Exception:
+            print('[!] Could\'nt connect to Gateway')
+            return
+        try:
+            request = ClientRequest(
+                type=RequestType.RT_RUN_ACTUATOR_ACTION,
+                device_name=device_name,
+                body=action_name,
+            )
+            request = request.SerializeToString()
+            sock.send(request)
+        except Exception:
+            print('[!] Error when sending request to Gateway')
+            return
+        try:
+            msg = recv_reply(sock)
+            reply = ClientReply()
+            reply.ParseFromString(msg)
+        except Exception:
+            print('[!] Error when waiting for Gateway response')
+            return
+    if reply.status is ReplyStatus.RS_UNKNOWN_DEVICE:
+        print(f'[!] Unknown actuator with name "{device_name}"')
+        return
+    if reply.status is ReplyStatus.RS_UNKNOWN_ACTION:
+        print(f'[!] Actuator "{device_name}" don\'t have action "{action_name}"')
+        return
+    if reply.status is not ReplyStatus.RS_OK:
+        print('[!] Something went wrong...')
+        return
+    try:
+        update = ActuatorUpdate()
+        update.ParseFromString(reply.data)
+        print_actuator_summary(update)
+    except Exception:
+        print('[!] Couldn\'t undestand Gateway response')
+        return
+
+
+def send_set_state_to_actuator(args, device_name, state_key, state_value):
+    state_string = '{"%s": %s}' %(state_key, state_value)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(args.base_timeout)
+        try:
+            sock.connect(args.gateway)
+        except Exception:
+            print('[!] Could\'nt connect to Gateway')
+            return
+        try:
+            request = ClientRequest(
+                type=RequestType.RT_SET_ACTUATOR_STATE,
+                device_name=device_name,
+                body=state_string,
+            )
+            request = request.SerializeToString()
+            sock.send(request)
+        except Exception:
+            print('[!] Error when sending request to Gateway')
+            return
+        try:
+            msg = recv_reply(sock)
+            reply = ClientReply()
+            reply.ParseFromString(msg)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            print('[!] Error when waiting for Gateway response')
+            return
+    if reply.status is ReplyStatus.RS_UNKNOWN_DEVICE:
+        print(f'[!] Unknown actuator with name "{device_name}"')
+        return
+    if reply.status is ReplyStatus.RS_INVALID_STATE:
+        print(f'[!] Invalid state for actuator "{device_name}": {state_string}')
+        return
+    if reply.status is not ReplyStatus.RS_OK:
+        print('[!] Something went wrong...')
+        return
+    try:
+        update = ActuatorUpdate()
+        update.ParseFromString(reply.data)
+        print_actuator_summary(update)
+    except Exception:
+        print('[!] Couldn\'t undestand Gateway response')
+        return
+
+
+def print_help(bad_command=False):
+    if bad_command:
+        print('[!] Command not understood', end='\n\n')
+    print('The following commands are available:')
+    print('  help      : show this help message')
+    print('  sensors   : list sensors devices')
+    print('  actuators : list actuators devices')
+    print('  actuator <name> <command>')
+    print('            : send command <command> to actuator <name>')
+    print('  actuator <name> <key> <value>')
+    print('            : set state <key> to <value> for actuator <name>', end='\n\n')
+
+
 def app(args):
-    while not args.stop_flag.is_set():
-        command = input('>>> ').strip().lower()
+    while True:
+        command = input('>>> ').strip()
+        command, *params = command.split()
+        command = command.lower()
         match command:
             case 'help':
                 print_help()
             case 'sensors':
-                print_sensors(args)
+                if params:
+                    print_help(True)
+                else:
+                    list_sensors(args)
             case 'actuators':
-                print_actuators(args)
-
-
-def stop_wrapper(func, stop_flag):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        finally:
-            stop_flag.set()
-    return wrapper
+                if params:
+                    print_help(True)
+                else:
+                    list_actuators(args)
+            case 'actuator':
+                if len(params) == 2:
+                    send_action_to_actuator(args, *params)
+                elif len(params) == 3:
+                    send_set_state_to_actuator(args, *params)
+                else:
+                    print_help(True)
+            case _:
+                print_help(True)
 
 
 def _run(args):
@@ -273,44 +286,15 @@ def _run(args):
         format='[%(levelname)s %(asctime)s] %(name)s\n  %(message)s',
     )
     try:
-        sensors_listener = threading.Thread(
-            target=stop_wrapper(sensors_report_listener, args.stop_flag),
-            args=(args,)
-        )
-        actuators_listener = threading.Thread(
-            target=stop_wrapper(actuators_report_listener, args.stop_flag),
-            args=(args,)
-        )
-        connector = threading.Thread(
-            target=stop_wrapper(gateway_connector, args.stop_flag),
-            args=(args,)
-        )
-        sensors_listener.start()
-        actuators_listener.start()
-        connector.start()
         app(args)
     except KeyboardInterrupt:
         print('\nSHUTTING DOWN...')
-    finally:
-        args.stop_flag.set()
-        sensors_listener.join()
-        actuators_listener.join()
 
 
 def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='Cliente simples em Python')
-
-    parser.add_argument(
-        '--sensors_port', type=int, default=60444,
-        help='Porta na qual receber os relatórios dos sensores.'
-    )
-
-    parser.add_argument(
-        '--actuators_port', type=int, default=60333,
-        help='Porta na qual receber os relatórios dos atuadores.'
-    )
 
     parser.add_argument(
         '--gateway_ip', type=str, default='localhost',
@@ -329,30 +313,15 @@ def main():
 
     args = parser.parse_args()
 
+    # Gateway address
+    args.gateway = (args.gateway_ip, args.gateway_port)
+
     # Logging
     lvl = args.level.strip().upper()
     args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
 
-    # Gateway connection
-    args.connection = None
-    args.connection_lock = threading.Lock()
-
     # Timeouts
     args.base_timeout = 2.0
-    args.generous_timeout = 120.0
-    args.report_timeout = 60.0
-
-    # Events
-    args.stop_flag = threading.Event()
-    args.gateway_connected = threading.Event()
-    args.receiving_sensors_data = threading.Event()
-    args.receiving_actuators_data = threading.Event()
-
-    # Storage
-    args.sensors_report = (0, None)
-    args.sensors_report_lock = threading.Lock()
-    args.actuators_report = (0, None)
-    args.actuators_report_lock = threading.Lock()
 
     return _run(args)
 
