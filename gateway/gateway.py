@@ -58,9 +58,7 @@ def _run(args):
         multicaster.start()
         sgenerator.start()
         agenerator.start()
-        while True:
-            time.sleep(10.0)
-        # clients_listener(args)
+        clients_listener(args)
     except KeyboardInterrupt:
         print('\nSHUTTING DOWN...')
     finally:
@@ -132,11 +130,6 @@ def main():
 
     # Timeouts
     args.base_timeout = 1.0
-    args.cautious_timeout = 5.0
-    args.generous_timeout = 120.0
-    args.client_timeout = None
-    args.actuators_timeout = None
-    args.reports_timeout = None
 
     # Host IP
     args.host_ip = socket.gethostbyname(socket.gethostname())
