@@ -3,7 +3,7 @@ const protobuf = require("protobufjs");
 const { ActuatorUpdate, JoinRequest, JoinReply, DeviceType, DeviceInfo, Address, ActuatorCommand, ActuatorComply, CommandType, ComplyStatus} = require('./protos/messages_pb');
 
 /**
- * Informaçoes da conexao Atuador <> Gateway
+ * Informaçoes da conexao Cliente <> Gateway
  */
 let IS_CONNECT = false;
 
@@ -12,11 +12,10 @@ let IS_CONNECT = false;
  * Informaçoes do atuador
  */
 const DEVICE_NAME = "LAMP";
-let LAMP_STATE = '{"Color": "yellow", "Brightness": 10}';
-const LAMP_METADATA = '{"isOn": "(yes ou no)", "Color": "(yellow ou white)", "Brightness": (Between 1 and 10)"}';
+let LAMP_STATE = '{"isOn": "yes" ,"Color": "yellow", "Brightness": 10}';
+const LAMP_METADATA = '{"isOn": "(yes ou no)", "Color": "(yellow ou white)", "Brightness": (Between 1 and 10)", "Actions": ["turn_on", "turn_off"]}';
 const PORT_ATUADOR = 60555;
 const HOST_ATUADOR = '127.0.0.1';
-let LAMP_ACTION = '{"Color": "yellow", "Brightness": 10}';
 
 /**
  * Variavel servidor TCP
@@ -89,14 +88,16 @@ function startServer() {
             if (actuatorCommand == CommandType.CT_GET_STATE) {
                 sendDataGateway(ComplyStatus.CS_OK);
             } else if (actuatorCommand == CommandType.CT_ACTION) {
-                if (actuatorCommand.getBody().toLowerCase() == "off") {
-                    //colocar no json state
-                    IS_ONLINE = false;
+                if (actuatorCommand.getBody().toLowerCase() == "turn_on") {
+                    const jsonState = JSON.parse(LAMP_STATE);
+                    jsonState.isOn = "yes";
+                    LAMP_STATE = JSON.stringify(jsonState);
                     sendDataGateway(ComplyStatus.CS_OK);
                 }
-                else if (actuatorCommand.getBody().toLowerCase() == "on") {
-                    //colocar no json state
-                    IS_ONLINE = true;
+                else if (actuatorCommand.getBody().toLowerCase() == "turn_off") {
+                    const jsonState = JSON.parse(LAMP_STATE);
+                    jsonState.isOn = "no";
+                    LAMP_STATE = JSON.stringify(jsonState);
                     sendDataGateway(ComplyStatus.CS_OK);
                 }
                 else {
