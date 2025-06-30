@@ -41,10 +41,19 @@ def sensors_report_generator(args):
 def sensors_listener(args):
     logger = logging.getLogger('SENSORS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.bind(('', args.sensors_port))
+        try:
+            sock.bind(('', args.sensors_port))
+        except Exception as e:
+            args.stop_flag.set()
+            logger.error(
+                'Erro ao tentar vínculo com a porta %s: (%s) %s',
+                args.sensors_port,
+                type(e).__name__,
+                e,
+            )
+            raise e
         logger.info(
-            'Escutando por dados sensoriais em (%s, %s)',
-            args.host_ip,
+            'Escutando por dados sensoriais na porta %s',
             args.sensors_port,
         )
         sock.settimeout(args.base_timeout)
@@ -55,18 +64,23 @@ def sensors_listener(args):
                 reading.ParseFromString(msg)
             except TimeoutError:
                 continue
+            except:
+                args.stop_flag.set()
+                raise
             logger.debug(
                 'Leitura de sensor recebida: (%s, %s, %.6f)',
                 reading.timestamp,
                 reading.device_name,
                 reading.reading_value,
             )
+            metadata = json.loads(reading.metadata)
+            timestamp = datetime.fromisoformat(reading.timestamp)
             with args.db_sensors_lock:
                 result = args.db.add_sensor_reading(
                     reading.device_name,
                     reading.reading_value,
-                    json.loads(reading.metadata),
-                    datetime.fromisoformat(reading.timestamp),
+                    metadata,
+                    timestamp,
                 )
             if not result:
                 logger.debug(
