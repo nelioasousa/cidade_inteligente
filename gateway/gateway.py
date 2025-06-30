@@ -7,7 +7,7 @@ from db import Database
 from registration_handler import multicast_location, registration_listener
 from sensors_handler import sensors_listener, sensors_report_generator
 from actuators_handler import actuators_listener, actuators_report_generator
-# from clients_handler import clients_listener
+from clients_handler import clients_listener
 from functools import wraps
 
 
@@ -58,9 +58,7 @@ def _run(args):
         multicaster.start()
         sgenerator.start()
         agenerator.start()
-        # clients_listener(args)
-        while not args.stop_flag.is_set():
-            time.sleep(10.0)
+        clients_listener(args)
     except KeyboardInterrupt:
         print('\nSHUTTING DOWN...')
     finally:
