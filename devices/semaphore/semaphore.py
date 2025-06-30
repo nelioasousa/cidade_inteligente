@@ -133,6 +133,7 @@ def process_set_state_command(args, state_string):
             continue
         if not isinstance(period, Real):
             return None
+        new_state[period] = float(period)
         if period < 5.0:  # Período mínimo de 5 segundos
             return None
     with args.state_lock:
