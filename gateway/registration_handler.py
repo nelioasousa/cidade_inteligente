@@ -42,21 +42,25 @@ def registration_handler(args, sock):
         match request.device_info.type:
             case DeviceType.DT_SENSOR:
                 report_port = args.sensors_port
+                metadata = json.loads(device_info.metadata)
                 with args.db_sensors_lock:
                     args.db.register_sensor(
                         name=device_info.name,
                         address=(device_addrs.ip, device_addrs.port),
-                        metadata=json.loads(device_info.metadata),
+                        metadata=metadata,
                     )
             case DeviceType.DT_ACTUATOR:
                 report_port = args.actuators_port
+                state = json.loads(device_info.state)
+                metadata = json.loads(device_info.metadata)
+                timestamp = datetime.fromisoformat(device_info.timestamp)
                 with args.db_actuators_lock:
                     args.db.register_actuator(
                         name=device_info.name,
                         address=(device_addrs.ip, device_addrs.port),
-                        state=json.loads(device_info.state),
-                        metadata=json.loads(device_info.metadata),
-                        timestamp=datetime.fromisoformat(device_info.timestamp),
+                        state=state,
+                        metadata=metadata,
+                        timestamp=timestamp,
                     )
             case _:
                 raise ValueError('Invalid DeviceType')
