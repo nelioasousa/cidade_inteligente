@@ -116,6 +116,7 @@ def build_update_message(args, state, timestamp):
         state=state,
         metadata=json.dumps(args.metadata),
         timestamp=timestamp,
+        is_online=True,
     )
 
 
@@ -128,13 +129,14 @@ def process_set_state_command(args, state_string):
         return None
     for period in ('GreenPeriod', 'YellowPeriod', 'RedPeriod'):
         try:
-            period = new_state[period]
+            period_value = new_state[period]
         except KeyError:
             continue
-        if not isinstance(period, Real):
+        if not isinstance(period_value, Real):
             return None
-        new_state[period] = float(period)
-        if period < 5.0:  # Período mínimo de 5 segundos
+        period_value = float(period_value)
+        new_state[period] = period_value
+        if period_value < 5.0:  # Período mínimo de 5 segundos
             return None
     with args.state_lock:
         args.state.update(new_state)
