@@ -4,6 +4,7 @@ import json
 import socket
 import logging
 import threading
+from numbers import Real
 from datetime import datetime, UTC
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
@@ -130,7 +131,7 @@ def process_set_state_command(args, state_string):
             period = new_state[period]
         except KeyError:
             continue
-        if not isinstance(period, float):
+        if not isinstance(period, Real):
             return None
         if period < 5.0:  # Período mínimo de 5 segundos
             return None
@@ -172,9 +173,6 @@ def process_command(args, command, logger):
 def command_handler(args, sock, address):
     try:
         logger = logging.getLogger(f'COMMAND_HANDLER_{address}')
-        if address[0] != args.gateway_ip:
-            logger.warning('Conexão indesejada rejeitada')
-            return
         sock.settimeout(args.base_timeout)
         msg = sock.recv(1024)
         command = ActuatorCommand()
