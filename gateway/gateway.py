@@ -143,14 +143,17 @@ def main():
     args.db = Database(clear=args.clear)
     args.stop_flag = threading.Event()
 
+    # Reports
+    args.reports_gen_interval = 10
+
     # Sensors utilities
     args.sensors_tolerance = 10.0
     args.db_sensors_lock = threading.Lock()
     args.db_sensors_report_lock = threading.Lock()
-    args.sensors_gen_interval = 10.0
 
     # Actuators utilities
     args.pending_actuators_updates = threading.Event()
+    args.pending_actuators_updates.set()
     args.db_actuators_lock = threading.Lock()
     args.db_actuators_report_lock = threading.Lock()
 

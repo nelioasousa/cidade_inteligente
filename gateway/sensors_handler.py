@@ -35,7 +35,7 @@ def sensors_report_generator(args):
         report = SensorsReport(devices=sensors).SerializeToString()
         with args.db_sensors_report_lock:
             args.db.sensors_report = report
-        time.sleep(args.sensors_gen_interval)
+        time.sleep(args.reports_gen_interval)
 
 
 def sensors_listener(args):

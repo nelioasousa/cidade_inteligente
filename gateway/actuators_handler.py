@@ -13,9 +13,10 @@ def actuators_report_generator(args):
     logger = logging.getLogger('ACTUATORS_REPORT_GENERATOR')
     logger.info('Iniciando o gerador de relatórios dos atuadores')
     while not args.stop_flag.is_set():
-        if not args.pending_actuators_updates.is_set():
+        for _ in range(args.reports_gen_interval):
+            if args.pending_actuators_updates.is_set():
+                break
             time.sleep(1.0)
-            continue
         with args.db_actuators_lock:
             actuators = args.db.get_actuators_summary()
             args.pending_actuators_updates.clear()
