@@ -5,45 +5,79 @@ import socket
 import threading
 import logging
 from struct import unpack
+from messages_pb2 import ActuatorUpdate
 from messages_pb2 import SensorsReport, ActuatorsReport
 from messages_pb2 import RequestType, ClientRequest
 from messages_pb2 import ReplyStatus, ClientReply
-from messages_pb2 import ActuatorUpdate, SensorData
+from messages_pb2 import SensorReading, SensorData
 
 
-def print_sensor_summary(sensor):
+def print_sensor_reading(sensor: SensorReading):
     metadata = json.loads(sensor.metadata)
     print('[INFO]')
-    print(' Sensor    : %s' %sensor.device_name)
-    print(' Reading   : %.3f' %sensor.reading_value)
-    print(' Timestamp : %s' %sensor.timestamp)
-    print(' Status    : %s' %('ONLINE' if sensor.is_online else 'OFFLINE'))
+    print('  Sensor    : %s' %sensor.device_name)
+    print('  Reading   : %.4f' %sensor.reading_value)
+    print('  Timestamp : %s' %sensor.timestamp)
+    print('  Status    : %s' %('ONLINE' if sensor.is_online else 'OFFLINE'))
     if metadata:
         max_key_length = max(len(k) for k in metadata)
         print('[METADATA]')
         for key, value in metadata.items():
-            print(f' {key.ljust(max_key_length)} : {value}')
+            print(f'  {key.ljust(max_key_length)} : {value}')
     print()
 
 
-def print_actuator_summary(actuator):
+def print_actuator_update(actuator: ActuatorUpdate):
     state = json.loads(actuator.state)
     metadata = json.loads(actuator.metadata)
     print('[INFO]')
-    print(' Actuator  : %s' %actuator.device_name)
-    print(' Timestamp : %s' %actuator.timestamp)
-    print(' Status    : %s' %('ONLINE' if actuator.is_online else 'OFFLINE'))
+    print('  Actuator  : %s' %actuator.device_name)
+    print('  Timestamp : %s' %actuator.timestamp)
+    print('  Status    : %s' %('ONLINE' if actuator.is_online else 'OFFLINE'))
     if state:
         max_key_length = max(len(k) for k in state)
         print('[STATE]')
         for key, value in state.items():
-            print(f' {key.ljust(max_key_length)} : {value}')
+            print(f'  {key.ljust(max_key_length)} : {value}')
     if metadata:
         max_key_length = max(len(k) for k in metadata)
         print('[METADATA]')
         for key, value in metadata.items():
-            print(f' {key.ljust(max_key_length)} : {value}')
+            print(f'  {key.ljust(max_key_length)} : {value}')
     print()
+
+
+def print_sensor_data(data: SensorData):
+    metadata = json.loads(data.metadata)
+    print('[INFO]')
+    print('  Sensor : %s' %data.device_name)
+    print('  Status : %s' %('ONLINE' if data.is_online else 'OFFLINE'))
+    if metadata:
+        max_key_length = max(len(k) for k in metadata)
+        print('[METADATA]')
+        for key, value in metadata.items():
+            print(f'  {key.ljust(max_key_length)} : {value}')
+    if data.readings:
+        print('[DATA]')
+        for reading in data.readings:
+            print(f'  {reading.timestamp} : {reading.reading_value}')
+    print()
+
+
+def print_sensors_report(report: SensorsReport):
+    if not report.devices:
+        print('No sensors to report')
+        return
+    for sensor in report.devices:
+        print_sensor_reading(sensor)
+
+
+def print_actuators_report(report: ActuatorsReport):
+    if not report.devices:
+        print('No actuators to report')
+        return
+    for actuator in report.devices:
+        print_actuator_update(actuator)
 
 
 def recv_exaclty(sock, n, timeout_tolerance=3):
@@ -70,7 +104,7 @@ def recv_reply(sock):
     return recv_exaclty(sock, msg_size)
 
 
-def list_sensors(args):
+def get_sensors_report(args):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(args.base_timeout)
         try:
@@ -98,17 +132,13 @@ def list_sensors(args):
     try:
         report = SensorsReport()
         report.ParseFromString(reply.data)
+        return report
     except Exception:
         print('[!] Couldn\'t undestand Gateway response')
         return
-    if not report.devices:
-        print('No sensors to report')
-        return
-    for sensor in report.devices:
-        print_sensor_summary(sensor)
 
 
-def list_actuators(args):
+def get_actuators_report(args):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(args.base_timeout)
         try:
@@ -136,14 +166,10 @@ def list_actuators(args):
     try:
         report = ActuatorsReport()
         report.ParseFromString(reply.data)
+        return report
     except Exception:
         print('[!] Couldn\'t undestand Gateway response')
         return
-    if not report.devices:
-        print('No actuators to report')
-        return
-    for actuator in report.devices:
-        print_actuator_summary(actuator)
 
 
 def send_action_to_actuator(args, device_name, action_name):
@@ -184,7 +210,7 @@ def send_action_to_actuator(args, device_name, action_name):
     try:
         update = ActuatorUpdate()
         update.ParseFromString(reply.data)
-        print_actuator_summary(update)
+        return update
     except Exception:
         print('[!] Couldn\'t undestand Gateway response')
         return
@@ -229,7 +255,7 @@ def send_set_state_to_actuator(args, device_name, state_key, state_value):
     try:
         update = ActuatorUpdate()
         update.ParseFromString(reply.data)
-        print_actuator_summary(update)
+        return update
     except Exception:
         print('[!] Couldn\'t undestand Gateway response')
         return
@@ -275,23 +301,6 @@ def get_sensor_data(args, device_name):
         return
 
 
-def print_sensor_data(data: SensorData):
-    metadata = json.loads(data.metadata)
-    print('[INFO]')
-    print('  Sensor : %s' %data.device_name)
-    print('  Status : %s' %('ONLINE' if data.is_online else 'OFFLINE'))
-    if metadata:
-        max_key_length = max(len(k) for k in metadata)
-        print('[METADATA]')
-        for key, value in metadata.items():
-            print(f'  {key.ljust(max_key_length)} : {value}')
-    if data.readings:
-        print('[DATA]')
-        for reading in data.readings:
-            print(f'  {reading.timestamp} : {reading.reading_value}')
-    print()
-
-
 def print_help(bad_command=False):
     if bad_command:
         print('[!] Command not understood', end='\n\n')
@@ -319,12 +328,16 @@ def app(args):
                 if params:
                     print_help(True)
                 else:
-                    list_sensors(args)
+                    report = get_sensors_report(args)
+                    if report is not None:
+                        print_sensors_report(report)
             case 'actuators':
                 if params:
                     print_help(True)
                 else:
-                    list_actuators(args)
+                    report = get_actuators_report(args)
+                    if report is not None:
+                        print_actuators_report(report)
             case 'sensor':
                 if len(params) == 1:
                     data = get_sensor_data(args, params[0])
@@ -333,9 +346,13 @@ def app(args):
                     print_help(True)
             case 'actuator':
                 if len(params) == 2:
-                    send_action_to_actuator(args, *params)
+                    update = send_action_to_actuator(args, *params)
+                    if update is not None:
+                        print_actuator_update(update)
                 elif len(params) == 3:
-                    send_set_state_to_actuator(args, *params)
+                    update = send_set_state_to_actuator(args, *params)
+                    if update is not None:
+                        print_actuator_update(update)
                 else:
                     print_help(True)
             case _:
