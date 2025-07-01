@@ -1,13 +1,14 @@
 const net = require('net');
 const protobuf = require("protobufjs");
 const { ActuatorUpdate, JoinRequest, JoinReply, DeviceType, DeviceInfo, Address, ActuatorCommand, ActuatorComply, CommandType, ComplyStatus} = require('./protos/messages_pb');
+const { console } = require('inspector');
 
 
 /**
  * Informaçoes do atuador
  */
 const DEVICE_NAME = "LAMP";
-let LAMP_STATE = '{"isOn": "yes" ,"Color": "yellow", "Brightness": 10}';
+let LAMP_STATE = '{"isOn": "yes" , "Color": "yellow", "Brightness": 10}';
 const LAMP_METADATA = '{"isOn": "(yes ou no)", "Color": "(yellow ou white)", "Brightness": "(Between 1 and 10)", "Actions": ["turn_on", "turn_off"]}';
 const PORT_ATUADOR = 60555;
 const HOST_ATUADOR = '127.0.0.1';
@@ -23,7 +24,7 @@ let hostTrasferData = null;
 function connectToGateway(ipGateway, portGateway) {
 
     if (connectionGateway != null) return;
-
+    
     portGatewayToConnect = portGateway;
     hostTrasferData = ipGateway;
 
@@ -82,54 +83,59 @@ function startServer() {
 
         // Receber comandos
         socket.on('data', (data) => {
+
+            socket.setTimeout(2000);
             
             // ActuatorCommand -> recebe
             const actuatorCommand = ActuatorCommand.deserializeBinary(data);
 
-            if (actuatorCommand == CommandType.CT_GET_STATE) {
-                sendDataGateway(ComplyStatus.CS_OK);
-            } else if (actuatorCommand == CommandType.CT_ACTION) {
+            if (actuatorCommand.getType() == CommandType.CT_GET_STATE) {
+                sendDataGateway(ComplyStatus.CS_OK, socket);
+            } else if (actuatorCommand.getType() == CommandType.CT_ACTION) {
                 if (actuatorCommand.getBody().toLowerCase() == "turn_on") {
                     const jsonState = JSON.parse(LAMP_STATE);
                     jsonState.isOn = "yes";
                     LAMP_STATE = JSON.stringify(jsonState);
-                    sendDataGateway(ComplyStatus.CS_OK);
+                    sendDataGateway(ComplyStatus.CS_OK, socket, socket);
                 }
                 else if (actuatorCommand.getBody().toLowerCase() == "turn_off") {
                     const jsonState = JSON.parse(LAMP_STATE);
                     jsonState.isOn = "no";
                     LAMP_STATE = JSON.stringify(jsonState);
-                    sendDataGateway(ComplyStatus.CS_OK);
+                    sendDataGateway(ComplyStatus.CS_OK, socket);
                 }
                 else {
-                    sendDataGateway(ComplyStatus.CS_UNKNOWN_ACTION);
+                    sendDataGateway(ComplyStatus.CS_UNKNOWN_ACTION, socket);
                 }
             }
-            else if (actuatorCommand == CommandType.CT_SET_STATE) {
-                if (validarBody()) {
-                    LAMP_STATE = actuatorCommand.getBody();
-                    sendDataGateway(ComplyStatus.CS_OK);
+            else if (actuatorCommand.getType() == CommandType.CT_SET_STATE) {
+                if (validarBody(actuatorCommand.getBody())) {
+                    const jsonBody = JSON.parse(actuatorCommand.getBody());
+                    const jsonState = JSON.parse(LAMP_STATE);
+                    const chaveBody = Object.keys(jsonBody)[0];
+                    jsonState[chaveBody] = jsonBody[chaveBody];
+                    LAMP_STATE = JSON.stringify(jsonState);
+                    sendDataGateway(ComplyStatus.CS_OK, socket);
                 }
                 else {
-                    sendDataGateway(ComplyStatus.CS_INVALID_STATE);
+                    sendDataGateway(ComplyStatus.CS_INVALID_STATE, socket);
                 }
                 
             }
-            else if (actuatorCommand == CommandType.CT_UNSPECIFIED) {
-                sendDataGateway(ComplyStatus.CS_UNSPECIFIED);
+            else if (actuatorCommand.getType() == CommandType.CT_UNSPECIFIED) {
+                sendDataGateway(ComplyStatus.CS_UNSPECIFIED, socket);
             }
         });
 
         // Evento: cliente desconectado
         socket.on('end', () => {
-            sendDataGateway(ComplyStatus.CS_FAIL);
-            console.log('Atuador desconectado');
+            console.log('Cliente desconectado');
         });
 
         // Evento: erro na conexão
         socket.on('error', (err) => {
             sendDataGateway(ComplyStatus.CS_FAIL);
-            console.error('Erro no atuador:', err.message);
+            console.error('Erro na conexao:', err.message);
         });
 
     });
@@ -144,18 +150,26 @@ function startServer() {
         sendDataGateway(ComplyStatus.CS_FAIL);
         console.error('Erro no atuador:', err.message);
     });
+
+    server.on('listening', () => {
+        console.log('Servidor está pronto para aceitar novas conexões.');
+    });
 }
 
-function sendDataGateway(complyStatus) {
+function sendDataGateway(complyStatus, socketServer) {
 
-    if (connectionGateway != null) {
+    if (socketServer != null && connectionGateway != null) {
         // Envia dados para o gateway
         const actuatorUpdate = new ActuatorUpdate();
         actuatorUpdate.setDeviceName(DEVICE_NAME);
         actuatorUpdate.setState(LAMP_STATE);
         actuatorUpdate.setMetadata(LAMP_METADATA);
         actuatorUpdate.setTimestamp(new Date(Date.now()).toISOString());
-        //actuatorUpdate.setIsOnline(false);
+        actuatorUpdate.setIsOnline(true);
+
+        //Informa a atualizacao
+        const updateCurrent = actuatorUpdate.serializeBinary();
+        connectionGateway.write(updateCurrent);
 
         // ActuatorComply -> manda uma mensagem o gateway
         const actuatorComply = new ActuatorComply();
@@ -165,8 +179,44 @@ function sendDataGateway(complyStatus) {
         const msgResponse = actuatorComply.serializeBinary();
 
         // Envia a mensagem para gateway
-        connectionGateway.write(msgResponse);
+        socketServer.write(msgResponse);
     }
+}
+
+function validarBody(body) {
+    if (body == null || body == undefined || isInvalidJson(body)) return false;
+
+    const jsonState = JSON.parse(LAMP_STATE);
+    const jsonBody = JSON.parse(body);
+    
+    const chavesOriginais = Object.keys(jsonState);
+    const chavesPassadas = Object.keys(jsonBody);
+    const todasAsChavesSaoValidas = chavesPassadas.every(chave => chavesOriginais.includes(chave));
+    
+    if (!todasAsChavesSaoValidas) return false;
+
+    if (chavesPassadas[0] == "Color" && (jsonBody[chavesPassadas[0]].toLowerCase() == "white" || jsonBody[chavesPassadas[0]].toLowerCase() == "yellow")) {
+        return true;
+    }
+
+    if (chavesPassadas[0] == "isOn" && (jsonBody[chavesPassadas[0]].toLowerCase() == "yes" || jsonBody[chavesPassadas[0]].toLowerCase() == "no")) {
+        return true;
+    }
+
+    if (chavesPassadas[0] == "Brightness" && jsonBody[chavesPassadas[0]] >= 1 && jsonBody[chavesPassadas[0]] <= 10) {
+        return true;
+    }
+
+    return false;
+}
+
+function isInvalidJson(str) {
+  try {
+    JSON.parse(str);
+    return false;
+  } catch (e) {
+    return true;
+  }
 }
 
 function turnOffAtuador() {
