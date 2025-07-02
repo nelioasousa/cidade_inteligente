@@ -1,21 +1,20 @@
 # 🌐 Cidade Inteligente - Sistemas Distribuídos com Sockets
-Este projeto simula uma Cidade Inteligente com sensores e atuadores que se comunicam com um Gateway central. Um aplicativo Flutter permite controle e monitoramento em tempo real. Também há uma cliente CLI que oferece funcionalidades semelhantes ao cliente Flutter.
+Este projeto simula uma Cidade Inteligente com sensores e atuadores que se comunicam com um Gateway central. Foi desenvolvido um cliente CLI que permite o monitoramento e controle dos dispositivos inteligentes.
 
 
 ## 🧠 O que é?
 
 Um sistema distribuído para aprendizado de comunicação entre processos. Ele simula:
 
-- **Dispositivos inteligentes:** sensores e atuadores que interagem com o ambiente.
-- **Gateway central:** responsável pela coordenação e comunicação entre dispositivos.
-- **App cliente:** interface de controle e monitoramento em tempo real.
+- **Dispositivos Inteligentes:** sensores e atuadores que interagem com o ambiente.
+- **Gateway Central:** responsável pela coordenação e comunicação entre dispositivos.
+- **Cliente CLI:** interface de controle e monitoramento em tempo real.
 
 ## 🔧 Tecnologias Utilizadas
 
 - **Ubuntu-24.04:** os sockets foram configurados tendo em mente uma plataforma Unix;
 - **Python v3.12.3:** desenvolvimento do gateway, cliente CLI, sensor de temperatura e semáforo (atuador);
 - **Node.js v20.18.2:** poste de iluminação (lâmpada inteligente);
-- **Flutter/Dart v3.27.2:** criação do aplicativo cliente;
 - **Sockets TCP e UDP:** comunicação entre dispositivos;
 - **UDP Multicast:** dispositivos inteligêntes descobrem a localização do gateway usando um grupo multicast;
 - **libprotoc v31.1:** compilação das mensagens `.proto`.
@@ -25,7 +24,6 @@ Um sistema distribuído para aprendizado de comunicação entre processos. Ele s
 ```
 cidade_inteligente/
 ├── clients/
-|   └── flutter_client/     # Cliente GUI Flutter
 │   └── simple_client/      # Cliente CLI Python
 ├── devices/                # Código dos dispositivos inteligentes
 │   ├── lamp_node/          # Lâmpada inteligente em Node.js
@@ -151,8 +149,6 @@ libprotoc 31.1
 $ protoc --python_out=. --pyi_out=. messages.proto
 # Node.js
 $ protoc --js_out=import_style=commonjs,binary:. messages.proto
-# Flutter
-$ protoc --dart_out=. messages.proto
 ```
 
 ### 2. Rodar os processos
@@ -184,11 +180,4 @@ ou
 $ cd cidade_inteligente/
 $ npm install protobufjs
 $ node devices/lamp_node/lamp.js
-```
-
-**Flutter:**
-```bash
-$ cd cidade_inteligente/clients/flutter_client
-$ flutter pub get
-$ flutter run
 ```
