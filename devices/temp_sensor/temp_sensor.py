@@ -224,7 +224,7 @@ def main():
     args.multicast_timeout = 5.0
 
     # Host IP
-    args.host_ip = socket.gethostbyname(socket.gethostname())
+    args.host_ip = socket.gethostbyname('localhost')
 
     # Gateway
     args.gateway_ip = None

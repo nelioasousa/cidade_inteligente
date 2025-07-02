@@ -408,7 +408,7 @@ def main():
     args.multicast_timeout = 5.0
 
     # Host IP
-    args.host_ip = socket.gethostbyname(socket.gethostname())
+    args.host_ip = socket.gethostbyname('localhost')
 
     # Send update after `update_interval` secs without communication
     args.update_interval = 10

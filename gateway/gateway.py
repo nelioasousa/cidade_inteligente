@@ -131,7 +131,7 @@ def main():
     args.base_timeout = 1.0
 
     # Host IP
-    args.host_ip = socket.gethostbyname(socket.gethostname())
+    args.host_ip = socket.gethostbyname('localhost')
 
     # Database and stop event
     args.db = Database(clear=args.clear)
