@@ -220,6 +220,11 @@ def command_listener(args):
             while not args.stop_flag.is_set():
                 try:
                     conn, addrs = sock.accept()
+                    if addrs[0] != args.gateway_ip:
+                        logger.warning('Conexão desconhecida rejeitada')
+                        conn.shutdown(socket.SHUT_RDWR)
+                        conn.close()
+                        continue
                 except TimeoutError:
                     continue
                 except Exception as e:
