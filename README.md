@@ -45,12 +45,108 @@ cidade_inteligente/
 └── README.md                # Documentação principal
 ```
 
+## Diagrama de funcionamento
+```mermaid
+flowchart BT
+    subgraph Gateway
+        descobrimento([Serviço de Descobrimento])
+        registro([Serviço de Registro])
+        sensores([Serviço de Sensores])
+        atuadores([Serviço de Atuadores])
+        relatorios([Gerador de Relatórios])
+    end
+
+    desc_descobrimento[Socket UDP enviando o endereço do Serviço de Registro ao grupo multicast 224.0.1.0 na porta 50444. Envia a cada 5 segundos.]
+    desc_descobrimento --- descobrimento
+
+    desc_registro[Servidor TCP escutando na porta 50111. É responsável pelo registro de dispositivos inteligentes.]
+    desc_registro --- registro
+
+    desc_sensores[Socket UDP escutando na porta 50222. É responsável por receber leituras dos sensores registrados.]
+    desc_sensores --- sensores
+
+    desc_atuadores[Servidor TCP escutando na porta 50333. É responsável por receber atualizações dos atuadores registrados.]
+    desc_atuadores --- atuadores
+
+    desc_relatorios[Gera a cada 5 segundos relatórios sobre os dispositivos registrados. Os relatórios contêm informações como metadados, estado e disponibilidade. Os clientes podem solicitar os relatórios.]
+    desc_relatorios --- relatorios
+```
+
+```mermaid
+flowchart TD
+    subgraph Sensor
+        envio([Thread de envio de dados])
+        descobrimento([Thread de descobrimento e checagem de disponibilidade])
+    end
+
+    enviar[Enviar leitura]
+    esperar[Esperar conexão]
+    conectar[Se registrar no Gateway]
+    desconectar[Desconectar o sensor]
+    continuar[Continuar escutando]
+    continuar2[Continuar conectado]
+
+    descp1{Conectado ao Gateway?}
+    descp2{Escutou o endereço do Gateway no grupo multicast?}
+    descp3{3 falhas seguidas ao tentar receber endereço?}
+
+    descobrimento-->descp1
+    descp1-->|Não|descp2
+    descp1-->|Sim|descp3
+    descp3-->|Sim|desconectar
+    descp3-->|Não|continuar2
+    descp2-->|Sim|conectar
+    descp2-->|Nao|continuar
+
+    envio-->envp1
+    envp1{Conectado ao Gateway?}
+    envp1-->|Sim|enviar
+    envp1-->|Não|esperar
+```
+
+```mermaid
+flowchart TD
+    subgraph Atuador
+        envio([Thread de envio de dados])
+        descobrimento([Thread de descobrimento e checagem de disponibilidade])
+        comandos([Servidor TCP esperando comandos do Gateway])
+    end
+
+    enviar[Enviar atualização ao Gateway]
+    esperar[Esperar conexão]
+    conectar[Se registrar no Gateway]
+    desconectar[Desconectar o sensor]
+    continuar[Continuar escutando]
+    continuar2[Continuar conectado]
+
+    descp1{Conectado ao Gateway?}
+    descp2{Escutou o endereço do Gateway no grupo multicast?}
+    descp3{3 falhas seguidas ao tentar receber endereço?}
+
+    descobrimento-->descp1
+    descp1-->|Não|descp2
+    descp1-->|Sim|descp3
+    descp3-->|Sim|desconectar
+    descp3-->|Não|continuar2
+    descp2-->|Sim|conectar
+    descp2-->|Nao|continuar
+
+    envio-->envp1
+    envp1{Atualização de estado?}
+    envp2{Conectado ao Gateway?}
+    envp1-->|Sim|envp2
+    envp2-->|Sim|enviar
+    envp2-->|Não|esperar
+```
+
 ## ▶️ Como Executar
 
-### 1. Copilar o arquivo de mensagens
+### 1. Compilar o arquivo de mensagens
 
 ```bash
-cd protos/
+$ cd protos/
+$ protoc --version
+libprotoc 31.1
 # Python
 $ protoc --python_out=. --pyi_out=. messages.proto
 # Node.js
