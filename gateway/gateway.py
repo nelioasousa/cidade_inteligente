@@ -146,7 +146,7 @@ def main():
     args.db_sensors_report_lock = threading.Lock()
 
     # Actuators utilities
-    args.actuators_tolerance = 60.0
+    args.actuators_tolerance = 10.0
     args.pending_actuators_updates = threading.Event()
     args.pending_actuators_updates.set()
     args.db_actuators_lock = threading.Lock()
