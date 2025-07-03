@@ -416,7 +416,7 @@ def main():
     args.host_ip = socket.gethostbyname('localhost')
 
     # Send update after `update_interval` secs without communication
-    args.update_interval = 10
+    args.update_interval = 5
 
     # Gateway
     args.gateway_ip = None
