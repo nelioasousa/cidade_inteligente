@@ -108,7 +108,7 @@ def get_sensors_report(args):
         try:
             sock.connect(args.gateway)
         except Exception:
-            print('[!] Could\'nt connect to Gateway')
+            print('[!] Unable to connect to Gateway')
             return
         try:
             request = ClientRequest(type=RequestType.RT_GET_SENSORS_REPORT)
@@ -132,7 +132,7 @@ def get_sensors_report(args):
         report.ParseFromString(reply.data)
         return report
     except Exception:
-        print('[!] Couldn\'t undestand Gateway response')
+        print('[!] Unable to understand Gateway response')
         return
 
 
@@ -142,7 +142,7 @@ def get_actuators_report(args):
         try:
             sock.connect(args.gateway)
         except Exception:
-            print('[!] Could\'nt connect to Gateway')
+            print('[!] Unable to connect to Gateway')
             return
         try:
             request = ClientRequest(type=RequestType.RT_GET_ACTUATORS_REPORT)
@@ -166,7 +166,7 @@ def get_actuators_report(args):
         report.ParseFromString(reply.data)
         return report
     except Exception:
-        print('[!] Couldn\'t undestand Gateway response')
+        print('[!] Unable to understand Gateway response')
         return
 
 
@@ -176,7 +176,7 @@ def send_action_to_actuator(args, device_name, action_name):
         try:
             sock.connect(args.gateway)
         except Exception:
-            print('[!] Could\'nt connect to Gateway')
+            print('[!] Unable to connect to Gateway')
             return
         try:
             request = ClientRequest(
@@ -200,7 +200,7 @@ def send_action_to_actuator(args, device_name, action_name):
         print(f'[!] Unknown actuator with name "{device_name}"')
         return
     if reply.status is ReplyStatus.RS_UNKNOWN_ACTION:
-        print(f'[!] Actuator "{device_name}" don\'t have action "{action_name}"')
+        print(f'[!] Actuator "{device_name}" do not have action "{action_name}"')
         return
     if reply.status is not ReplyStatus.RS_OK:
         print('[!] Something went wrong...')
@@ -210,7 +210,7 @@ def send_action_to_actuator(args, device_name, action_name):
         update.ParseFromString(reply.data)
         return update
     except Exception:
-        print('[!] Couldn\'t undestand Gateway response')
+        print('[!] Unable to understand Gateway response')
         return
 
 
@@ -221,7 +221,7 @@ def send_set_state_to_actuator(args, device_name, state_key, state_value):
         try:
             sock.connect(args.gateway)
         except Exception:
-            print('[!] Could\'nt connect to Gateway')
+            print('[!] Unable to connect to Gateway')
             return
         try:
             request = ClientRequest(
@@ -255,7 +255,7 @@ def send_set_state_to_actuator(args, device_name, state_key, state_value):
         update.ParseFromString(reply.data)
         return update
     except Exception:
-        print('[!] Couldn\'t undestand Gateway response')
+        print('[!] Unable to understand Gateway response')
         return
 
 
@@ -265,7 +265,7 @@ def get_sensor_data(args, device_name):
         try:
             sock.connect(args.gateway)
         except Exception:
-            print('[!] Could\'nt connect to Gateway')
+            print('[!] Unable to connect to Gateway')
             return
         try:
             request = ClientRequest(
@@ -295,7 +295,7 @@ def get_sensor_data(args, device_name):
         data.ParseFromString(reply.data)
         return data
     except Exception:
-        print('[!] Couldn\'t undestand Gateway response')
+        print('[!] Unable to understand Gateway response')
         return
 
 
