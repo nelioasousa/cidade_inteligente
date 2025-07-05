@@ -218,15 +218,8 @@ def command_listener(args):
             raise e
         with ThreadPoolExecutor(max_workers=5) as executor:
             while not args.stop_flag.is_set():
-                with args.connection_lock:
-                    gateway_ip = args.gateway_ip
                 try:
                     conn, addrs = sock.accept()
-                    if addrs[0] != gateway_ip:
-                        logger.warning('Conexão desconhecida rejeitada')
-                        conn.shutdown(socket.SHUT_RDWR)
-                        conn.close()
-                        continue
                 except TimeoutError:
                     continue
                 except Exception as e:
@@ -236,6 +229,24 @@ def command_listener(args):
                         e,
                     )
                     continue
+                try:
+                    with args.connection_lock:
+                        gateway_ip = args.gateway_ip
+                    if addrs[0] != gateway_ip:
+                        try:
+                            conn.shutdown(socket.SHUT_RDWR)
+                        except OSError:
+                            logger.error(
+                                'Erro ao tentar encerrar conexão com %s',
+                                addrs,
+                            )
+                        finally:
+                            conn.close()
+                        logger.warning('Conexão desconhecida rejeitada')
+                        continue
+                except Exception:
+                    conn.close()
+                    raise
                 try:
                     executor.submit(command_handler, args, conn, addrs)
                 except:
