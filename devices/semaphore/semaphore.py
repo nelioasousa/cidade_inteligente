@@ -176,7 +176,6 @@ def process_command(args, command, logger):
 def command_handler(args, sock, address):
     try:
         logger = logging.getLogger(f'COMMAND_HANDLER_{address}')
-        sock.settimeout(args.base_timeout)
         msg = sock.recv(1024)
         command = ActuatorCommand()
         command.ParseFromString(msg)
@@ -220,6 +219,7 @@ def command_listener(args):
             while not args.stop_flag.is_set():
                 try:
                     conn, addrs = sock.accept()
+                    conn.settimeout(sock.gettimeout())
                 except TimeoutError:
                     continue
                 except Exception as e:

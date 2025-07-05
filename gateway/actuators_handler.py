@@ -155,6 +155,7 @@ def actuators_listener(args):
             while not args.stop_flag.is_set():
                 try:
                     conn, addrs = sock.accept()
+                    conn.settimeout(sock.gettimeout())
                 except TimeoutError:
                     continue
                 except Exception as e:
