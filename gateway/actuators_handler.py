@@ -111,8 +111,15 @@ def actuator_handler(args, sock, address):
         )
         raise e
     finally:
-        sock.shutdown(socket.SHUT_RDWR)
-        sock.close()
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            logger.error(
+                'Erro ao tentar enviar FIN para %s',
+                address,
+            )
+        finally:
+            sock.close()
     if not args.db.is_actuator_registered(update.device_name):
         logger.warning(
             'Atuador não registrado enviando atualizações: %s',
@@ -155,7 +162,6 @@ def actuators_listener(args):
             while not args.stop_flag.is_set():
                 try:
                     conn, addrs = sock.accept()
-                    conn.settimeout(sock.gettimeout())
                 except TimeoutError:
                     continue
                 except Exception as e:
@@ -166,8 +172,16 @@ def actuators_listener(args):
                     )
                     continue
                 try:
+                    conn.settimeout(sock.gettimeout())
                     executor.submit(actuator_handler, args, conn, addrs)
-                except:
-                    conn.shutdown(socket.SHUT_RDWR)
-                    conn.close()
+                except Exception:
+                    try:
+                        conn.shutdown(socket.SHUT_RDWR)
+                    except OSError:
+                        logger.error(
+                            'Erro ao tentar enviar FIN para %s',
+                            addrs,
+                        )
+                    finally:
+                        conn.close()
                     raise

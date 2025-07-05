@@ -76,8 +76,15 @@ def registration_handler(args, sock, address):
         )
         raise e
     finally:
-        sock.shutdown(socket.SHUT_RDWR)
-        sock.close()
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            logger.error(
+                'Erro ao tentar enviar FIN para %s',
+                address,
+            )
+        finally:
+            sock.close()
 
 
 def registration_listener(args):
@@ -96,12 +103,19 @@ def registration_listener(args):
             while not args.stop_flag.is_set():
                 try:
                     conn, addrs = sock.accept()
-                    conn.settimeout(sock.gettimeout())
                 except TimeoutError:
                     continue
                 try:
+                    conn.settimeout(sock.gettimeout())
                     executor.submit(registration_handler, args, conn, addrs)
-                except:
-                    conn.shutdown(socket.SHUT_RDWR)
-                    conn.close()
+                except Exception:
+                    try:
+                        conn.shutdown(socket.SHUT_RDWR)
+                    except OSError:
+                        logger.error(
+                            'Erro ao tentar enviar FIN para %s',
+                            addrs,
+                        )
+                    finally:
+                        conn.close()
                     raise
