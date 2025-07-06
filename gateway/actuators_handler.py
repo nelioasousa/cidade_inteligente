@@ -171,6 +171,15 @@ def actuators_listener(args):
                         e,
                     )
                     continue
+                with args.db_actuators_lock:
+                    actuator_name = args.db.get_actuator_name_by_ip(addrs[0])
+                if actuator_name is None:
+                    logger.warning(
+                        'Recebendo atualizações de um atuador '
+                        'não registrado localizado em %s',
+                        addrs[0],
+                    )
+                    continue
                 try:
                     conn.settimeout(sock.gettimeout())
                     executor.submit(actuator_handler, args, conn, addrs)
