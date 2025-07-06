@@ -66,6 +66,12 @@ class Database:
     def is_sensor_registered(self, name):
         return name in self.data.sensors
 
+    def get_sensor_name_by_ip(self, ip):
+        for sensor_name, sensor_data in self.data.sensors.items():
+            if sensor_data['address'][0] == ip:
+                return sensor_name
+        return None
+
     def is_actuator_registered(self, name):
         return name in self.data.actuators
 

@@ -4,6 +4,7 @@ import socket
 import logging
 from datetime import date, datetime
 from messages_pb2 import SensorReading, SensorsReport
+from google.protobuf.message import DecodeError
 
 
 def sensors_report_generator(args):
@@ -59,10 +60,26 @@ def sensors_listener(args):
         sock.settimeout(args.base_timeout)
         while not args.stop_flag.is_set():
             try:
-                msg, _ = sock.recvfrom(1024)
+                msg, addrs = sock.recvfrom(1024)
+            except TimeoutError:
+                continue
+            with args.db_sensors_lock:
+                sensor_name = args.db.get_sensor_name_by_ip(addrs[0])
+            if sensor_name is None:
+                logger.warning(
+                    'Recebendo leituras de um sensor '
+                    'não registrado localizado em %s',
+                    addrs[0],
+                )
+                continue
+            try:
                 reading = SensorReading()
                 reading.ParseFromString(msg)
-            except TimeoutError:
+            except DecodeError:
+                logger.error(
+                    'Não foi possível desserializar leitura do sensor %s',
+                    sensor_name,
+                )
                 continue
             logger.debug(
                 'Leitura de sensor recebida: (%s, %s, %.6f)',
@@ -73,14 +90,9 @@ def sensors_listener(args):
             metadata = json.loads(reading.metadata)
             timestamp = datetime.fromisoformat(reading.timestamp)
             with args.db_sensors_lock:
-                result = args.db.add_sensor_reading(
+                args.db.add_sensor_reading(
                     reading.device_name,
                     reading.reading_value,
                     metadata,
                     timestamp,
-                )
-            if not result:
-                logger.debug(
-                    'Recebendo leituras de um sensor não registrado: %s',
-                    reading.device_name,
                 )
