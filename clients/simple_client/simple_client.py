@@ -216,6 +216,11 @@ def send_action_to_actuator(args, device_name, action_name):
 
 def send_set_state_to_actuator(args, device_name, state_key, state_value):
     state_string = '{"%s": %s}' %(state_key, state_value)
+    try:
+        _ = json.loads(state_string)
+    except json.JSONDecodeError:
+        print(f'[!] An invalid JSON was assembled: {state_string}')
+        return
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(args.base_timeout)
         try:
@@ -303,15 +308,19 @@ def print_help(bad_command=False):
     if bad_command:
         print('[!] Command not understood', end='\n\n')
     print('The following commands are available:')
-    print('  help      : show this help message')
-    print('  sensors   : list sensors devices')
-    print('  actuators : list actuators devices')
+    print('  help      : Show this help message')
+    print('  sensors   : List sensors devices')
+    print('  actuators : List actuators devices')
     print('  sensor <name>')
-    print('            : show all available data of sensor <name>')
+    print('            : Show all available data of sensor <name>')
     print('  actuator <name> <command>')
-    print('            : send command <command> to actuator <name>')
+    print('            : Send command <command> to actuator <name>')
+    print('            : <name> and <command> must not be enclosed in double quotes')
     print('  actuator <name> <key> <value>')
-    print('            : set state <key> to <value> for actuator <name>', end='\n\n')
+    print('            : Set state <key> to <value> for actuator <name>')
+    print('            : <value> must be a valid stringfyed JSON value')
+    print('            : <key> must not be enclosed in double quotes')
+    print('            : If <value> is a string, it must be enclosed in double quotes', end='\n\n')
 
 
 def app(args):
