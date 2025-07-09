@@ -65,14 +65,14 @@ function connectToGateway(ipGateway, portGateway) {
 
 function connectPortTrasferData() {
     closeConnectionGateway();
-    // Criando uma nova conexao TCP com o Gateway em outra porta
+    /* Criando uma nova conexao TCP com o Gateway em outra porta
     connectionGateway = net.createConnection({
         host: hostTrasferData,
         port: portTrasferData,
     }, () => {
         console.log(`Conectado ao gateway ${hostTrasferData}:${portTrasferData}`);
     });
-
+    */
     sendUpdateGateway();
 
     // criando servidor atuador porta 60555
@@ -159,6 +159,7 @@ function startServer() {
 }
 
 function sendUpdateGateway() {
+    openConnectionGateway();
     if (connectionGateway != null) {
         // Envia dados para o gateway
         const actuatorUpdate = new ActuatorUpdate();
@@ -172,10 +173,12 @@ function sendUpdateGateway() {
         const updateCurrent = actuatorUpdate.serializeBinary();
         connectionGateway.write(updateCurrent);
     }
+    closeConnectionGateway();
 }
 
 function sendDataGateway(complyStatus, socketServer) {
-
+    closeConnectionGateway();
+    openConnectionGateway();
     if (socketServer != null && connectionGateway != null) {
         // Envia dados para o gateway
         const actuatorUpdate = new ActuatorUpdate();
@@ -248,6 +251,15 @@ function closeConnectionGateway() {
         connectionGateway.end();
         connectionGateway = null;
     }
+}
+
+function openConnectionGateway() {
+    connectionGateway = net.createConnection({
+        host: hostTrasferData,
+        port: portTrasferData,
+    }, () => {
+        console.log(`Conectado ao gateway ${hostTrasferData}:${portTrasferData}`);
+    });
 }
 
 function formatToCustomISO(date) {
