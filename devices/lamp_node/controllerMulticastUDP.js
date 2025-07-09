@@ -26,7 +26,7 @@ let isSended = false;
  * Função para criar socket
  */
 function createSocketMulticast() {
-  socket = dgram.createSocket('udp4');
+  socket = dgram.createSocket({type: 'udp4', reuseAddr: true});
 }
 
 /**

@@ -1,7 +1,6 @@
 const net = require('net');
 const protobuf = require("protobufjs");
 const { ActuatorUpdate, JoinRequest, JoinReply, DeviceType, DeviceInfo, Address, ActuatorCommand, ActuatorComply, CommandType, ComplyStatus} = require('./protos/messages_pb');
-const { console } = require('inspector');
 
 
 /**
@@ -42,7 +41,7 @@ function connectToGateway(ipGateway, portGateway) {
     dataRegisterActuator.setName(DEVICE_NAME);
     dataRegisterActuator.setState(LAMP_STATE);
     dataRegisterActuator.setMetadata(LAMP_METADATA);
-    dataRegisterActuator.setTimestamp(new Date(Date.now()).toISOString());
+    dataRegisterActuator.setTimestamp(formatToCustomISO(new Date()));
 
     const address = new Address(); // porta do atuador 
     address.setIp(HOST_ATUADOR);
@@ -164,7 +163,7 @@ function sendDataGateway(complyStatus, socketServer) {
         actuatorUpdate.setDeviceName(DEVICE_NAME);
         actuatorUpdate.setState(LAMP_STATE);
         actuatorUpdate.setMetadata(LAMP_METADATA);
-        actuatorUpdate.setTimestamp(new Date(Date.now()).toISOString());
+        actuatorUpdate.setTimestamp(formatToCustomISO(new Date()));
         actuatorUpdate.setIsOnline(true);
 
         //Informa a atualizacao
@@ -230,6 +229,20 @@ function closeConnectionGateway() {
         connectionGateway.end();
         connectionGateway = null;
     }
+}
+
+function formatToCustomISO(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
+
+    const offset = '+00:00';
+
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}000${offset}`;
 }
 
 module.exports = {
