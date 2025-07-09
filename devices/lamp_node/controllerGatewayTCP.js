@@ -267,7 +267,7 @@ function formatToCustomISO(date) {
 // Run after 5s, then every 5s
 setTimeout(() => {
     sendUpdateGateway(); // Initial call
-    const intervalId = setInterval(logMessage, 5000);
+    setInterval(sendUpdateGateway, 5000);
 }, 5000);
 
 module.exports = {
