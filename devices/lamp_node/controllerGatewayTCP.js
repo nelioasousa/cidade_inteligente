@@ -8,7 +8,7 @@ const { ActuatorUpdate, JoinRequest, JoinReply, DeviceType, DeviceInfo, Address,
  */
 const DEVICE_NAME = "LAMP";
 let LAMP_STATE = '{"isOn": "yes" , "Color": "yellow", "Brightness": 10}';
-const LAMP_METADATA = '{"isOn": "(yes ou no)", "Color": "(yellow ou white)", "Brightness": "(Between 1 and 10)", "Actions": ["turn_on", "turn_off"]}';
+const LAMP_METADATA = '{"isOn": "(yes or no)", "Color": "(yellow or white)", "Brightness": "(Between 1 and 10)", "Actions": ["turn_on", "turn_off"]}';
 const PORT_ATUADOR = 60555;
 const HOST_ATUADOR = '127.0.0.1';
 
@@ -73,17 +73,7 @@ function connectPortTrasferData() {
         console.log(`Conectado ao gateway ${hostTrasferData}:${portTrasferData}`);
     });
 
-     // Envia dados para o gateway
-    const actuatorUpdate = new ActuatorUpdate();
-    actuatorUpdate.setDeviceName(DEVICE_NAME);
-    actuatorUpdate.setState(LAMP_STATE);
-    actuatorUpdate.setMetadata(LAMP_METADATA);
-    actuatorUpdate.setTimestamp(formatToCustomISO(new Date()));
-    actuatorUpdate.setIsOnline(true);
-
-    //Informa a atualizacao
-    const updateCurrent = actuatorUpdate.serializeBinary();
-    connectionGateway.write(updateCurrent);
+    sendUpdateGateway();
 
     // criando servidor atuador porta 60555
     startServer();
@@ -166,6 +156,22 @@ function startServer() {
     server.on('listening', () => {
         console.log('Servidor está pronto para aceitar novas conexões.');
     });
+}
+
+function sendUpdateGateway() {
+    if (connectionGateway != null) {
+        // Envia dados para o gateway
+        const actuatorUpdate = new ActuatorUpdate();
+        actuatorUpdate.setDeviceName(DEVICE_NAME);
+        actuatorUpdate.setState(LAMP_STATE);
+        actuatorUpdate.setMetadata(LAMP_METADATA);
+        actuatorUpdate.setTimestamp(formatToCustomISO(new Date()));
+        actuatorUpdate.setIsOnline(true);
+
+        //Informa a atualizacao
+        const updateCurrent = actuatorUpdate.serializeBinary();
+        connectionGateway.write(updateCurrent);
+    }
 }
 
 function sendDataGateway(complyStatus, socketServer) {
@@ -257,6 +263,12 @@ function formatToCustomISO(date) {
 
     return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}000${offset}`;
 }
+
+// Run after 5s, then every 5s
+setTimeout(() => {
+    sendUpdateGateway(); // Initial call
+    const intervalId = setInterval(logMessage, 5000);
+}, 5000);
 
 module.exports = {
   server,
