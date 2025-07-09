@@ -159,6 +159,7 @@ function startServer() {
 }
 
 function sendUpdateGateway() {
+    closeConnectionGateway();
     openConnectionGateway();
     if (connectionGateway != null) {
         // Envia dados para o gateway
