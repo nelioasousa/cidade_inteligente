@@ -255,12 +255,14 @@ function closeConnectionGateway() {
 }
 
 function openConnectionGateway() {
-    connectionGateway = net.createConnection({
-        host: hostTrasferData,
-        port: portTrasferData,
-    }, () => {
-        console.log(`Conectado ao gateway ${hostTrasferData}:${portTrasferData}`);
-    });
+    if (hostTrasferData && portTrasferData) {
+        connectionGateway = net.createConnection({
+            host: hostTrasferData,
+            port: portTrasferData,
+        }, () => {
+            console.log(`Conectado ao gateway ${hostTrasferData}:${portTrasferData}`);
+        });
+    }
 }
 
 function formatToCustomISO(date) {
