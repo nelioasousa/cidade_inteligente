@@ -430,7 +430,7 @@ def main():
     args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
     
     # Identifier
-    args.name = f'Semaphore-{args.name}'
+    args.name = f'Sema-{args.name}'
 
     # Timeouts
     args.base_timeout = 2.0
