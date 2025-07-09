@@ -262,6 +262,9 @@ function openConnectionGateway() {
         }, () => {
             console.log(`Conectado ao gateway ${hostTrasferData}:${portTrasferData}`);
         });
+        connectionGateway.on('error', (err) => {
+            closeConnectionGateway();
+        });
     }
 }
 
