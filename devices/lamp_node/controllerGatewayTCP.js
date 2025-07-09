@@ -72,6 +72,19 @@ function connectPortTrasferData() {
     }, () => {
         console.log(`Conectado ao gateway ${hostTrasferData}:${portTrasferData}`);
     });
+
+     // Envia dados para o gateway
+    const actuatorUpdate = new ActuatorUpdate();
+    actuatorUpdate.setDeviceName(DEVICE_NAME);
+    actuatorUpdate.setState(LAMP_STATE);
+    actuatorUpdate.setMetadata(LAMP_METADATA);
+    actuatorUpdate.setTimestamp(formatToCustomISO(new Date()));
+    actuatorUpdate.setIsOnline(true);
+
+    //Informa a atualizacao
+    const updateCurrent = actuatorUpdate.serializeBinary();
+    connectionGateway.write(updateCurrent);
+
     // criando servidor atuador porta 60555
     startServer();
 }

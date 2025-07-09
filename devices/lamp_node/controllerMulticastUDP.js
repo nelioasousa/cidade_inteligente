@@ -36,7 +36,7 @@ function connectToMulticast() {
   try {
     // Configura o socket para receber mensagens multicast
     socket.on('listening', () => {
-      socket.addMembership(MULTICAST_ADDRESS); // Inscreve-se no grupo multicast
+      socket.addMembership(MULTICAST_ADDRESS); // Se adicionando ao grupo multicast
       reconnectAttempts = 0; // Resetar tentativas após conexão bem-sucedida
     });
 
