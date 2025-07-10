@@ -17,8 +17,6 @@ class Database:
         if os.path.isfile(self.db_file):
             with open(self.db_file, mode='br') as db:
                 self.data = pickle.load(db)
-            for actuator in self.data.actuators:
-                self.data.actuators[actuator]['is_online'] = False
         else:
             self.data = self.empty_db()
 
@@ -44,7 +42,6 @@ class Database:
         actuator['state'] = state
         actuator['metadata'] = metadata
         actuator['timestamp'] = timestamp
-        actuator['is_online'] = True
         actuator['last_seen'] = (datetime.date.today(), time.monotonic())
 
     def persist(self):
@@ -103,21 +100,12 @@ class Database:
             actuator = self.data.actuators[name]
         except KeyError:
             return False
-        if timestamp < actuator['timestamp']:
-            return False
-        actuator['state'] = state
-        actuator['metadata'] = metadata
-        actuator['timestamp'] = timestamp
-        actuator['is_online'] = True
-        actuator['last_seen'] = (datetime.date.today(), time.monotonic())
+        if timestamp >= actuator['timestamp']:
+            actuator['state'] = state
+            actuator['metadata'] = metadata
+            actuator['timestamp'] = timestamp
+            actuator['last_seen'] = (datetime.date.today(), time.monotonic())
         return True
-
-    def mark_actuator_as_offline(self, name):
-        try:
-            self.data.actuators[name]['is_online'] = False
-            return True
-        except KeyError:
-            return False
 
     def get_sensors_summary(self):
         summary = []

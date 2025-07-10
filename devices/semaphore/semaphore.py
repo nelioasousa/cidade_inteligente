@@ -116,7 +116,6 @@ def build_update_message(args, state, timestamp):
         state=state,
         metadata=json.dumps(args.metadata),
         timestamp=timestamp,
-        is_online=True,
     )
 
 

@@ -69,18 +69,13 @@ def send_actuator_command(args, actuator_name, command_type, command_body):
     if address is None:
         return None
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(args.base_timeout)
         try:
-            sock.settimeout(args.base_timeout)
             sock.connect(address)
             sock.send(command)
             msg = sock.recv(1024)
-        except Exception:
-            msg = None
-    if msg is None:
-        with args.db_actuators_lock:
-            args.db.mark_actuator_as_offline(actuator_name)
-            args.pending_actuators_updates.set()
-        return None
+        except OSError:
+            return None
     reply = ActuatorComply()
     reply.ParseFromString(msg)
     state = json.loads(reply.update.state)
