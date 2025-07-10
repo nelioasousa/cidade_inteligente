@@ -304,6 +304,46 @@ def get_sensor_data(args, device_name):
         return
 
 
+def get_actuator_update(args, device_name):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(args.base_timeout)
+        try:
+            sock.connect(args.gateway)
+        except Exception:
+            print('[!] Unable to connect to Gateway')
+            return
+        try:
+            request = ClientRequest(
+                type=RequestType.RT_GET_ACTUATOR_UPDATE,
+                device_name=device_name,
+            )
+            request = request.SerializeToString()
+            sock.send(request)
+        except Exception:
+            print('[!] Error when sending request to Gateway')
+            return
+        try:
+            msg = recv_reply(sock)
+            reply = ClientReply()
+            reply.ParseFromString(msg)
+        except Exception:
+            print('[!] Error when receiving Gateway response')
+            return
+    if reply.status is ReplyStatus.RS_UNKNOWN_DEVICE:
+        print(f'[!] Unknown actuator with name "{device_name}"')
+        return
+    if reply.status is not ReplyStatus.RS_OK:
+        print('[!] Something went wrong...')
+        return
+    try:
+        update = ActuatorUpdate()
+        update.ParseFromString(reply.data)
+        return update
+    except Exception:
+        print('[!] Unable to understand Gateway response')
+        return
+
+
 def print_help(bad_command=False):
     if bad_command:
         print('[!] Command not understood', end='\n\n')
@@ -313,6 +353,8 @@ def print_help(bad_command=False):
     print('  actuators : List actuators devices')
     print('  sensor <name>')
     print('            : Show all available data of sensor <name>')
+    print('  actuator <name>')
+    print('            : Show actuator <name> informations')
     print('  actuator <name> <command>')
     print('            : Send command <command> to actuator <name>')
     print('            : <name> and <command> must not be enclosed in double quotes')
@@ -356,7 +398,11 @@ def app(args):
                 else:
                     print_help(True)
             case 'actuator':
-                if len(params) == 2:
+                if len(params) == 1:
+                    update = get_actuator_update(args, params[0])
+                    if update is not None:
+                        print_actuator_update(update)
+                elif len(params) == 2:
                     update = send_action_to_actuator(args, *params)
                     if update is not None:
                         print_actuator_update(update)
