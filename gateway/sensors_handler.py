@@ -4,7 +4,6 @@ import socket
 import logging
 from datetime import date, datetime
 from messages_pb2 import SensorReading, SensorsReport
-from google.protobuf.message import DecodeError
 
 
 def sensors_report_generator(args):
@@ -72,15 +71,8 @@ def sensors_listener(args):
                     addrs[0],
                 )
                 continue
-            try:
-                reading = SensorReading()
-                reading.ParseFromString(msg)
-            except DecodeError:
-                logger.error(
-                    'Não foi possível desserializar leitura do sensor %s',
-                    sensor_name,
-                )
-                continue
+            reading = SensorReading()
+            reading.ParseFromString(msg)
             logger.debug(
                 'Leitura de sensor recebida: (%s, %s, %.6f)',
                 reading.timestamp,
