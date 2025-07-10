@@ -102,7 +102,7 @@ def recv_reply(sock):
     return recv_exaclty(sock, msg_size)
 
 
-def get_sensors_report(args):
+def send_request_to_gateway(args, request):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(args.base_timeout)
         try:
@@ -111,9 +111,7 @@ def get_sensors_report(args):
             print('[!] Unable to connect to Gateway')
             return
         try:
-            request = ClientRequest(type=RequestType.RT_GET_SENSORS_REPORT)
-            request = request.SerializeToString()
-            sock.send(request)
+            sock.send(request.SerializeToString())
         except Exception:
             print('[!] Error when sending request to Gateway')
             return
@@ -121,11 +119,19 @@ def get_sensors_report(args):
             msg = recv_reply(sock)
             reply = ClientReply()
             reply.ParseFromString(msg)
+            return reply
         except Exception:
             print('[!] Error when receiving Gateway response')
             return
+
+
+def get_sensors_report(args):
+    request = ClientRequest(type=RequestType.RT_GET_SENSORS_REPORT)
+    reply = send_request_to_gateway(args, request)
+    if reply is None:
+        return
     if reply.status is not ReplyStatus.RS_OK:
-        print('[!] Gateway failure')
+        print('[!] Something went wrong...')
         return
     try:
         report = SensorsReport()
@@ -137,29 +143,12 @@ def get_sensors_report(args):
 
 
 def get_actuators_report(args):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(args.base_timeout)
-        try:
-            sock.connect(args.gateway)
-        except Exception:
-            print('[!] Unable to connect to Gateway')
-            return
-        try:
-            request = ClientRequest(type=RequestType.RT_GET_ACTUATORS_REPORT)
-            request = request.SerializeToString()
-            sock.send(request)
-        except Exception:
-            print('[!] Error when sending request to Gateway')
-            return
-        try:
-            msg = recv_reply(sock)
-            reply = ClientReply()
-            reply.ParseFromString(msg)
-        except Exception:
-            print('[!] Error when receiving Gateway response')
-            return
+    request = ClientRequest(type=RequestType.RT_GET_ACTUATORS_REPORT)
+    reply = send_request_to_gateway(args, request)
+    if reply is None:
+        return
     if reply.status is not ReplyStatus.RS_OK:
-        print('[!] Gateway failure')
+        print('[!] Something went wrong...')
         return
     try:
         report = ActuatorsReport()
@@ -171,31 +160,14 @@ def get_actuators_report(args):
 
 
 def send_action_to_actuator(args, device_name, action_name):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(args.base_timeout)
-        try:
-            sock.connect(args.gateway)
-        except Exception:
-            print('[!] Unable to connect to Gateway')
-            return
-        try:
-            request = ClientRequest(
-                type=RequestType.RT_RUN_ACTUATOR_ACTION,
-                device_name=device_name,
-                body=action_name,
-            )
-            request = request.SerializeToString()
-            sock.send(request)
-        except Exception:
-            print('[!] Error when sending request to Gateway')
-            return
-        try:
-            msg = recv_reply(sock)
-            reply = ClientReply()
-            reply.ParseFromString(msg)
-        except Exception:
-            print('[!] Error when receiving Gateway response')
-            return
+    request = ClientRequest(
+        type=RequestType.RT_RUN_ACTUATOR_ACTION,
+        device_name=device_name,
+        body=action_name,
+    )
+    reply = send_request_to_gateway(args, request)
+    if reply is None:
+        return
     if reply.status is ReplyStatus.RS_UNKNOWN_DEVICE:
         print(f'[!] Unknown actuator with name "{device_name}"')
         return
@@ -221,31 +193,14 @@ def send_set_state_to_actuator(args, device_name, state_key, state_value):
     except json.JSONDecodeError:
         print(f'[!] An invalid JSON was assembled: {state_string}')
         return
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(args.base_timeout)
-        try:
-            sock.connect(args.gateway)
-        except Exception:
-            print('[!] Unable to connect to Gateway')
-            return
-        try:
-            request = ClientRequest(
-                type=RequestType.RT_SET_ACTUATOR_STATE,
-                device_name=device_name,
-                body=state_string,
-            )
-            request = request.SerializeToString()
-            sock.send(request)
-        except Exception:
-            print('[!] Error when sending request to Gateway')
-            return
-        try:
-            msg = recv_reply(sock)
-            reply = ClientReply()
-            reply.ParseFromString(msg)
-        except Exception:
-            print('[!] Error when receiving Gateway response')
-            return
+    request = ClientRequest(
+        type=RequestType.RT_SET_ACTUATOR_STATE,
+        device_name=device_name,
+        body=state_string,
+    )
+    reply = send_request_to_gateway(args, request)
+    if reply is None:
+        return
     if reply.status is ReplyStatus.RS_UNKNOWN_DEVICE:
         print(f'[!] Unknown actuator with name "{device_name}"')
         return
@@ -265,30 +220,13 @@ def send_set_state_to_actuator(args, device_name, state_key, state_value):
 
 
 def get_sensor_data(args, device_name):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(args.base_timeout)
-        try:
-            sock.connect(args.gateway)
-        except Exception:
-            print('[!] Unable to connect to Gateway')
-            return
-        try:
-            request = ClientRequest(
-                type=RequestType.RT_GET_SENSOR_DATA,
-                device_name=device_name,
-            )
-            request = request.SerializeToString()
-            sock.send(request)
-        except Exception:
-            print('[!] Error when sending request to Gateway')
-            return
-        try:
-            msg = recv_reply(sock)
-            reply = ClientReply()
-            reply.ParseFromString(msg)
-        except Exception:
-            print('[!] Error when receiving Gateway response')
-            return
+    request = ClientRequest(
+        type=RequestType.RT_GET_SENSOR_DATA,
+        device_name=device_name,
+    )
+    reply = send_request_to_gateway(args, request)
+    if reply is None:
+        return
     if reply.status is ReplyStatus.RS_UNKNOWN_DEVICE:
         print(f'[!] Unknown sensor with name "{device_name}"')
         return
@@ -305,30 +243,13 @@ def get_sensor_data(args, device_name):
 
 
 def get_actuator_update(args, device_name):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(args.base_timeout)
-        try:
-            sock.connect(args.gateway)
-        except Exception:
-            print('[!] Unable to connect to Gateway')
-            return
-        try:
-            request = ClientRequest(
-                type=RequestType.RT_GET_ACTUATOR_UPDATE,
-                device_name=device_name,
-            )
-            request = request.SerializeToString()
-            sock.send(request)
-        except Exception:
-            print('[!] Error when sending request to Gateway')
-            return
-        try:
-            msg = recv_reply(sock)
-            reply = ClientReply()
-            reply.ParseFromString(msg)
-        except Exception:
-            print('[!] Error when receiving Gateway response')
-            return
+    request = ClientRequest(
+        type=RequestType.RT_GET_ACTUATOR_UPDATE,
+        device_name=device_name,
+    )
+    reply = send_request_to_gateway(args, request)
+    if reply is None:
+        return
     if reply.status is ReplyStatus.RS_UNKNOWN_DEVICE:
         print(f'[!] Unknown actuator with name "{device_name}"')
         return
