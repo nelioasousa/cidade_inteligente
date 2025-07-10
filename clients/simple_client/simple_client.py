@@ -1,7 +1,6 @@
 import sys
 import json
 import socket
-import logging
 from struct import unpack
 from messages_pb2 import ActuatorUpdate
 from messages_pb2 import SensorsReport, ActuatorsReport
@@ -338,11 +337,6 @@ def app(args):
 
 
 def _run(args):
-    logging.basicConfig(
-        level=args.level,
-        handlers=(logging.StreamHandler(sys.stdout),),
-        format='[%(levelname)s %(asctime)s] %(name)s\n  %(message)s',
-    )
     try:
         app(args)
     except KeyboardInterrupt:
@@ -364,19 +358,10 @@ def main():
         help='Porta do Gateway para comunicação com clientes.'
     )
 
-    parser.add_argument(
-        '-l', '--level', type=str, default='INFO',
-        help='Nível do logging. Valores permitidos são "DEBUG", "INFO", "WARN", "ERROR".'
-    )
-
     args = parser.parse_args()
 
     # Gateway address
     args.gateway = (args.gateway_ip, args.gateway_port)
-
-    # Logging
-    lvl = args.level.strip().upper()
-    args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
 
     # Timeouts
     args.base_timeout = 2.0
