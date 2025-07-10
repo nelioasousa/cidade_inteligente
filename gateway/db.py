@@ -17,8 +17,6 @@ class Database:
         if os.path.isfile(self.db_file):
             with open(self.db_file, mode='br') as db:
                 self.data = pickle.load(db)
-            for actuator in self.data.actuators:
-                self.data.actuators[actuator]['is_online'] = False
         else:
             self.data = self.empty_db()
 
@@ -44,7 +42,6 @@ class Database:
         actuator['state'] = state
         actuator['metadata'] = metadata
         actuator['timestamp'] = timestamp
-        actuator['is_online'] = True
         actuator['last_seen'] = (datetime.date.today(), time.monotonic())
 
     def persist(self):
@@ -65,6 +62,18 @@ class Database:
 
     def is_sensor_registered(self, name):
         return name in self.data.sensors
+
+    def get_sensor_name_by_ip(self, ip):
+        for sensor_name, sensor_data in self.data.sensors.items():
+            if sensor_data['address'][0] == ip:
+                return sensor_name
+        return None
+
+    def get_actuator_name_by_ip(self, ip):
+        for actuator_name, actuator_data in self.data.actuators.items():
+            if actuator_data['address'][0] == ip:
+                return actuator_name
+        return None
 
     def is_actuator_registered(self, name):
         return name in self.data.actuators
@@ -91,21 +100,12 @@ class Database:
             actuator = self.data.actuators[name]
         except KeyError:
             return False
-        if timestamp < actuator['timestamp']:
-            return False
-        actuator['state'] = state
-        actuator['metadata'] = metadata
-        actuator['timestamp'] = timestamp
-        actuator['is_online'] = True
-        actuator['last_seen'] = (datetime.date.today(), time.monotonic())
+        if timestamp >= actuator['timestamp']:
+            actuator['state'] = state
+            actuator['metadata'] = metadata
+            actuator['timestamp'] = timestamp
+            actuator['last_seen'] = (datetime.date.today(), time.monotonic())
         return True
-
-    def mark_actuator_as_offline(self, name):
-        try:
-            self.data.actuators[name]['is_online'] = False
-            return True
-        except KeyError:
-            return False
 
     def get_sensors_summary(self):
         summary = []

@@ -51,12 +51,19 @@ def build_actuator_update(args, device_name):
         actuator = args.db.get_actuator(device_name)
     if actuator is None:
         return None
+    now_clock = time.monotonic()
+    tolerance = args.actuators_tolerance
+    last_seen = actuator['last_seen']
+    is_online = (
+        last_seen[0] == datetime.date.today()
+        and (now_clock - last_seen[1]) <= tolerance
+    )
     return ActuatorUpdate(
         device_name=device_name,
         state=json.dumps(actuator['state']),
         metadata=json.dumps(actuator['metadata']),
         timestamp=actuator['timestamp'].isoformat(),
-        is_online=actuator['is_online'],
+        is_online=is_online,
     )
 
 
@@ -216,8 +223,15 @@ def client_handler(args, sock, address):
             )
             raise e
     finally:
-        sock.shutdown(socket.SHUT_RDWR)
-        sock.close()
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            logger.error(
+                'Erro ao tentar enviar FIN para %s',
+                address,
+            )
+        finally:
+            sock.close()
 
 
 def clients_listener(args):
@@ -246,8 +260,16 @@ def clients_listener(args):
                     )
                     raise e
                 try:
+                    conn.settimeout(sock.gettimeout())
                     executor.submit(client_handler, args, conn, addrs)
-                except:
-                    conn.shutdown(socket.SHUT_RDWR)
-                    conn.close()
+                except Exception:
+                    try:
+                        conn.shutdown(socket.SHUT_RDWR)
+                    except OSError:
+                        logger.error(
+                            'Erro ao tentar enviar FIN para %s',
+                            addrs,
+                        )
+                    finally:
+                        conn.close()
                     raise

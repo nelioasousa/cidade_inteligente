@@ -1,7 +1,6 @@
 const net = require('net');
 const protobuf = require("protobufjs");
 const { ActuatorUpdate, JoinRequest, JoinReply, DeviceType, DeviceInfo, Address, ActuatorCommand, ActuatorComply, CommandType, ComplyStatus} = require('./protos/messages_pb');
-const { console } = require('inspector');
 
 
 /**
@@ -9,7 +8,7 @@ const { console } = require('inspector');
  */
 const DEVICE_NAME = "LAMP";
 let LAMP_STATE = '{"isOn": "yes" , "Color": "yellow", "Brightness": 10}';
-const LAMP_METADATA = '{"isOn": "(yes ou no)", "Color": "(yellow ou white)", "Brightness": "(Between 1 and 10)", "Actions": ["turn_on", "turn_off"]}';
+const LAMP_METADATA = '{"isOn": "(yes or no)", "Color": "(yellow or white)", "Brightness": "(Between 1 and 10)", "Actions": ["turn_on", "turn_off"]}';
 const PORT_ATUADOR = 60555;
 const HOST_ATUADOR = '127.0.0.1';
 
@@ -42,7 +41,7 @@ function connectToGateway(ipGateway, portGateway) {
     dataRegisterActuator.setName(DEVICE_NAME);
     dataRegisterActuator.setState(LAMP_STATE);
     dataRegisterActuator.setMetadata(LAMP_METADATA);
-    dataRegisterActuator.setTimestamp(new Date(Date.now()).toISOString());
+    dataRegisterActuator.setTimestamp(formatToCustomISO(new Date()));
 
     const address = new Address(); // porta do atuador 
     address.setIp(HOST_ATUADOR);
@@ -66,13 +65,16 @@ function connectToGateway(ipGateway, portGateway) {
 
 function connectPortTrasferData() {
     closeConnectionGateway();
-    // Criando uma nova conexao TCP com o Gateway em outra porta
+    /* Criando uma nova conexao TCP com o Gateway em outra porta
     connectionGateway = net.createConnection({
         host: hostTrasferData,
         port: portTrasferData,
     }, () => {
         console.log(`Conectado ao gateway ${hostTrasferData}:${portTrasferData}`);
     });
+    */
+    sendUpdateGateway();
+
     // criando servidor atuador porta 60555
     startServer();
 }
@@ -156,15 +158,35 @@ function startServer() {
     });
 }
 
-function sendDataGateway(complyStatus, socketServer) {
+function sendUpdateGateway() {
+    closeConnectionGateway();
+    openConnectionGateway();
+    if (connectionGateway != null) {
+        // Envia dados para o gateway
+        const actuatorUpdate = new ActuatorUpdate();
+        actuatorUpdate.setDeviceName(DEVICE_NAME);
+        actuatorUpdate.setState(LAMP_STATE);
+        actuatorUpdate.setMetadata(LAMP_METADATA);
+        actuatorUpdate.setTimestamp(formatToCustomISO(new Date()));
+        actuatorUpdate.setIsOnline(true);
 
+        //Informa a atualizacao
+        const updateCurrent = actuatorUpdate.serializeBinary();
+        connectionGateway.write(updateCurrent);
+    }
+    closeConnectionGateway();
+}
+
+function sendDataGateway(complyStatus, socketServer) {
+    closeConnectionGateway();
+    openConnectionGateway();
     if (socketServer != null && connectionGateway != null) {
         // Envia dados para o gateway
         const actuatorUpdate = new ActuatorUpdate();
         actuatorUpdate.setDeviceName(DEVICE_NAME);
         actuatorUpdate.setState(LAMP_STATE);
         actuatorUpdate.setMetadata(LAMP_METADATA);
-        actuatorUpdate.setTimestamp(new Date(Date.now()).toISOString());
+        actuatorUpdate.setTimestamp(formatToCustomISO(new Date()));
         actuatorUpdate.setIsOnline(true);
 
         //Informa a atualizacao
@@ -231,6 +253,40 @@ function closeConnectionGateway() {
         connectionGateway = null;
     }
 }
+
+function openConnectionGateway() {
+    if (hostTrasferData && portTrasferData) {
+        connectionGateway = net.createConnection({
+            host: hostTrasferData,
+            port: portTrasferData,
+        }, () => {
+            console.log(`Conectado ao gateway ${hostTrasferData}:${portTrasferData}`);
+        });
+        connectionGateway.on('error', (err) => {
+            closeConnectionGateway();
+        });
+    }
+}
+
+function formatToCustomISO(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
+
+    const offset = '+00:00';
+
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}000${offset}`;
+}
+
+// Run after 5s, then every 5s
+setTimeout(() => {
+    sendUpdateGateway(); // Initial call
+    setInterval(sendUpdateGateway, 5000);
+}, 5000);
 
 module.exports = {
   server,

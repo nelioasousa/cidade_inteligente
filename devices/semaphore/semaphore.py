@@ -116,7 +116,6 @@ def build_update_message(args, state, timestamp):
         state=state,
         metadata=json.dumps(args.metadata),
         timestamp=timestamp,
-        is_online=True,
     )
 
 
@@ -176,7 +175,6 @@ def process_command(args, command, logger):
 def command_handler(args, sock, address):
     try:
         logger = logging.getLogger(f'COMMAND_HANDLER_{address}')
-        sock.settimeout(args.base_timeout)
         msg = sock.recv(1024)
         command = ActuatorCommand()
         command.ParseFromString(msg)
@@ -189,8 +187,15 @@ def command_handler(args, sock, address):
             e,
         )
     finally:
-        sock.shutdown(socket.SHUT_RDWR)
-        sock.close()
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            logger.error(
+                'Erro ao tentar enviar FIN para %s',
+                address,
+            )
+        finally:
+            sock.close()
 
 
 def command_listener(args):
@@ -220,11 +225,6 @@ def command_listener(args):
             while not args.stop_flag.is_set():
                 try:
                     conn, addrs = sock.accept()
-                    if addrs[0] != args.gateway_ip:
-                        logger.warning('Conexão desconhecida rejeitada')
-                        conn.shutdown(socket.SHUT_RDWR)
-                        conn.close()
-                        continue
                 except TimeoutError:
                     continue
                 except Exception as e:
@@ -235,10 +235,33 @@ def command_listener(args):
                     )
                     continue
                 try:
-                    executor.submit(command_handler, args, conn, addrs)
-                except:
-                    conn.shutdown(socket.SHUT_RDWR)
-                    conn.close()
+                    with args.connection_lock:
+                        gateway_ip = args.gateway_ip
+                    if addrs[0] != gateway_ip:
+                        try:
+                            conn.shutdown(socket.SHUT_RDWR)
+                        except OSError:
+                            logger.error(
+                                'Erro ao tentar enviar FIN para %s',
+                                addrs,
+                            )
+                        finally:
+                            conn.close()
+                        logger.warning('Conexão desconhecida rejeitada')
+                        continue
+                    else:
+                        conn.settimeout(sock.gettimeout())
+                        executor.submit(command_handler, args, conn, addrs)
+                except Exception:
+                    try:
+                        conn.shutdown(socket.SHUT_RDWR)
+                    except OSError:
+                        logger.error(
+                            'Erro ao tentar enviar FIN para %s',
+                            addrs,
+                        )
+                    finally:
+                        conn.close()
                     raise
 
 
@@ -406,7 +429,7 @@ def main():
     args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
     
     # Identifier
-    args.name = f'Semaphore-{args.name}'
+    args.name = f'Sema-{args.name}'
 
     # Timeouts
     args.base_timeout = 2.0

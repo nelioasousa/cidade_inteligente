@@ -69,18 +69,13 @@ def send_actuator_command(args, actuator_name, command_type, command_body):
     if address is None:
         return None
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(args.base_timeout)
         try:
-            sock.settimeout(args.base_timeout)
             sock.connect(address)
             sock.send(command)
             msg = sock.recv(1024)
-        except Exception:
-            msg = None
-    if msg is None:
-        with args.db_actuators_lock:
-            args.db.mark_actuator_as_offline(actuator_name)
-            args.pending_actuators_updates.set()
-        return None
+        except OSError:
+            return None
     reply = ActuatorComply()
     reply.ParseFromString(msg)
     state = json.loads(reply.update.state)
@@ -111,8 +106,15 @@ def actuator_handler(args, sock, address):
         )
         raise e
     finally:
-        sock.shutdown(socket.SHUT_RDWR)
-        sock.close()
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            logger.error(
+                'Erro ao tentar enviar FIN para %s',
+                address,
+            )
+        finally:
+            sock.close()
     if not args.db.is_actuator_registered(update.device_name):
         logger.warning(
             'Atuador não registrado enviando atualizações: %s',
@@ -164,9 +166,26 @@ def actuators_listener(args):
                         e,
                     )
                     continue
+                with args.db_actuators_lock:
+                    actuator_name = args.db.get_actuator_name_by_ip(addrs[0])
+                if actuator_name is None:
+                    logger.warning(
+                        'Recebendo atualizações de um atuador '
+                        'não registrado localizado em %s',
+                        addrs[0],
+                    )
+                    continue
                 try:
+                    conn.settimeout(sock.gettimeout())
                     executor.submit(actuator_handler, args, conn, addrs)
-                except:
-                    conn.shutdown(socket.SHUT_RDWR)
-                    conn.close()
+                except Exception:
+                    try:
+                        conn.shutdown(socket.SHUT_RDWR)
+                    except OSError:
+                        logger.error(
+                            'Erro ao tentar enviar FIN para %s',
+                            addrs,
+                        )
+                    finally:
+                        conn.close()
                     raise

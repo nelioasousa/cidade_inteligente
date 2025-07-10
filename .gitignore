@@ -5,7 +5,6 @@ __pycache__
 venv/
 
 # Outros
-/test.py
 db.pickle
 
 # Node

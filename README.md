@@ -43,7 +43,7 @@ cidade_inteligente/
 └── README.md                # Documentação principal
 ```
 
-## Diagrama de funcionamento
+## Diagramas de funcionamento
 ```mermaid
 flowchart BT
     subgraph Gateway
@@ -63,7 +63,7 @@ flowchart BT
     desc_sensores[Socket UDP escutando na porta 50222. É responsável por receber leituras dos sensores registrados.]
     desc_sensores --- sensores
 
-    desc_atuadores[Servidor TCP escutando na porta 50333. É responsável por receber atualizações dos atuadores registrados.]
+    desc_atuadores[Servidor TCP escutando na porta 50333. É responsável por receber atualizações dos atuadores registrados. Também possuí funcionalidades para enviar comandos aos atuadores.]
     desc_atuadores --- atuadores
 
     desc_relatorios[Gera a cada 5 segundos relatórios sobre os dispositivos registrados. Os relatórios contêm informações como metadados, estado e disponibilidade. Os clientes podem solicitar os relatórios.]
@@ -80,21 +80,29 @@ flowchart TD
     enviar[Enviar leitura]
     esperar[Esperar conexão]
     conectar[Se registrar no Gateway]
-    desconectar[Desconectar o sensor]
+    desconectar[Desconectar dispositivo e realizar novo registro]
+    desconectar_se[Desconectar se conectado]
     continuar[Continuar escutando]
-    continuar2[Continuar conectado]
+    continuar_conn[Continuar conectado]
 
-    descp1{Conectado ao Gateway?}
-    descp2{Escutou o endereço do Gateway no grupo multicast?}
-    descp3{3 falhas seguidas ao tentar receber endereço?}
+    perg_conn{Conectado ao Gateway?}
+    perg_escutou{Escutou o endereço do Gateway no grupo multicast?}
+    perg_realocar{O IP recebido no multicast mudou?}
+    perg_falhas{3 falhas seguidas ao tentar receber endereço?}
 
-    descobrimento-->descp1
-    descp1-->|Não|descp2
-    descp1-->|Sim|descp3
-    descp3-->|Sim|desconectar
-    descp3-->|Não|continuar2
-    descp2-->|Sim|conectar
-    descp2-->|Nao|continuar
+    descobrimento-->perg_escutou
+    perg_escutou-->|Não|perg_falhas
+    perg_escutou-->|Sim|perg_conn
+    perg_falhas-->|Sim|desconectar_se
+    desconectar_se-->continuar
+    perg_falhas-->|Não|continuar
+    perg_conn-->|Não|conectar
+    conectar-->continuar
+    perg_conn-->|Sim|perg_realocar
+    perg_realocar-->|Não|continuar_conn
+    continuar_conn-->continuar
+    perg_realocar-->|Sim|desconectar
+    desconectar-->continuar
 
     envio-->envp1
     envp1{Conectado ao Gateway?}
@@ -110,31 +118,44 @@ flowchart TD
         comandos([Servidor TCP esperando comandos do Gateway])
     end
 
+    conectar[Se registrar no Gateway]
+    desconectar[Desconectar dispositivo e realizar novo registro]
+    desconectar_se[Desconectar se conectado]
+    continuar[Continuar escutando]
+    continuar_conn[Continuar conectado]
+
+    perg_conn{Conectado ao Gateway?}
+    perg_escutou{Escutou o endereço do Gateway no grupo multicast?}
+    perg_realocar{O IP recebido no multicast mudou?}
+    perg_falhas{3 falhas seguidas ao tentar receber endereço?}
+
+    descobrimento-->perg_escutou
+    perg_escutou-->|Não|perg_falhas
+    perg_escutou-->|Sim|perg_conn
+    perg_falhas-->|Sim|desconectar_se
+    desconectar_se-->continuar
+    perg_falhas-->|Não|continuar
+    perg_conn-->|Não|conectar
+    conectar-->continuar
+    perg_conn-->|Sim|perg_realocar
+    perg_realocar-->|Não|continuar_conn
+    continuar_conn-->continuar
+    perg_realocar-->|Sim|desconectar
+    desconectar-->continuar
+
     enviar[Enviar atualização ao Gateway]
     esperar[Esperar conexão]
-    conectar[Se registrar no Gateway]
-    desconectar[Desconectar o sensor]
-    continuar[Continuar escutando]
-    continuar2[Continuar conectado]
 
-    descp1{Conectado ao Gateway?}
-    descp2{Escutou o endereço do Gateway no grupo multicast?}
-    descp3{3 falhas seguidas ao tentar receber endereço?}
+    perg_atualizacao{Atualização de estado?}
+    perg_conn_envio{Conectado ao Gateway?}
+    perg_passou{Passou 5 segundos sem novas atualizações?}
 
-    descobrimento-->descp1
-    descp1-->|Não|descp2
-    descp1-->|Sim|descp3
-    descp3-->|Sim|desconectar
-    descp3-->|Não|continuar2
-    descp2-->|Sim|conectar
-    descp2-->|Nao|continuar
-
-    envio-->envp1
-    envp1{Atualização de estado?}
-    envp2{Conectado ao Gateway?}
-    envp1-->|Sim|envp2
-    envp2-->|Sim|enviar
-    envp2-->|Não|esperar
+    envio-->perg_conn_envio
+    perg_conn_envio-->|Sim|perg_atualizacao
+    perg_conn_envio-->|Não|esperar
+    perg_atualizacao-->|Não|perg_passou
+    perg_atualizacao-->|Sim|enviar
+    perg_passou-->|Sim|enviar
 ```
 
 ## ▶️ Como Executar

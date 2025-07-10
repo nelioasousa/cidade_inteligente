@@ -217,7 +217,7 @@ def main():
     args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
 
     # Identifier
-    args.name = f'Temperature-{args.name}'
+    args.name = f'Temp-{args.name}'
 
     # Timeouts
     args.base_timeout = 2.0
