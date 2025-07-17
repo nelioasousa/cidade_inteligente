@@ -1,3 +1,4 @@
+from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 from sessions import SessionMaker
@@ -16,7 +17,12 @@ class SensorRepository:
     def __init__(self, session_maker: sessionmaker):
         self.session_maker = session_maker
 
-    def add_sensor(self, sensor_type: str, ip_address: str, metadata: dict):
+    def add_sensor(
+        self,
+        sensor_type: str,
+        ip_address: str,
+        metadata: dict[str, Any]
+    ):
         sensor = self.get_sensor_by_ip_address(ip_address)
         if sensor is None:
             with self.session_maker.begin() as session:
@@ -71,8 +77,8 @@ class ActuatorRepository:
         actuator_type: str,
         ip_address: str,
         communication_port: int,
-        current_state: dict,
-        metadata: dict
+        current_state: dict[str, Any],
+        metadata: dict[str, Any]
     ):
         actuator = self.get_actuator_by_address(ip_address, communication_port)
         if actuator is None:
@@ -122,4 +128,18 @@ class ActuatorRepository:
             if actuator is None:
                 return False
             actuator.mark_as_seen()
+            return True
+
+    def register_actuator_update(
+        self,
+        actuator_id: int,
+        current_state: dict[str, Any],
+        metadata: dict[str, Any],
+    ):
+        with self.session_maker.begin() as session:
+            actuator = session.get(Actuator, actuator_id)
+            if actuator is None:
+                return False
+            actuator.current_state = current_state
+            actuator.metadata = metadata
             return True
