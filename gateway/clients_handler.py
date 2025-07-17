@@ -6,6 +6,7 @@ import datetime
 from struct import pack
 from actuators_handler import send_actuator_command
 from concurrent.futures import ThreadPoolExecutor
+from db.repositories import get_sensor_repository, get_actuator_repository
 from messages_pb2 import SensorData
 from messages_pb2 import RequestType, ClientRequest
 from messages_pb2 import ReplyStatus, ClientReply
@@ -14,61 +15,67 @@ from messages_pb2 import ActuatorUpdate, CommandType, ComplyStatus
 
 def get_sensors_report(args):
     with args.db_sensors_report_lock:
-        return args.db.sensors_report
+        return args.sensors_report
 
 
 def get_actuators_report(args):
     with args.db_actuators_report_lock:
-        return args.db.actuators_report
+        return args.actuators_report
 
 
 def build_sensor_data(args, device_name):
-    with args.db_sensors_lock:
-        sensor = args.db.get_sensor(device_name)
+    sensors_repository = get_sensor_repository()
+    sensor_id = int(device_name.split('-')[-1])
+    sensor = sensors_repository.get_sensor_by_id(sensor_id)
     if sensor is None:
         return None
+    readings = sensors_repository.get_sensor_readings(sensor.id)
+    readings.sort(key=(lambda x: x.timestamp))
     readings = [
         SensorData.SimpleReading(
-            timestamp=timestamp.isoformat(), reading_value=reading,
+            timestamp=reading.timestamp.isoformat(), reading_value=reading.value,
         )
-        for timestamp, reading in sensor['data']
+        for reading in readings
     ]
-    ls_day, ls_clock = sensor['last_seen']
+    ls_day = sensor.last_seen_date
+    ls_clock = sensor.last_seen_clock
     is_online = (
         ls_day == datetime.date.today()
         and (time.monotonic() - ls_clock) <= args.sensors_tolerance
     )
     return SensorData(
         device_name=device_name,
-        metadata=json.dumps(sensor['metadata']),
+        metadata=json.dumps(sensor.current_metadata),
         readings=readings,
         is_online=is_online,
     )
 
 
 def build_actuator_update(args, device_name):
-    with args.db_actuators_lock:
-        actuator = args.db.get_actuator(device_name)
+    actuators_repository = get_actuator_repository()
+    actuator_id = int(device_name.split('-')[-1])
+    actuator = actuators_repository.get_actuator_by_id(actuator_id)
     if actuator is None:
         return None
     now_clock = time.monotonic()
     tolerance = args.actuators_tolerance
-    last_seen = actuator['last_seen']
     is_online = (
-        last_seen[0] == datetime.date.today()
-        and (now_clock - last_seen[1]) <= tolerance
+        actuator.last_seen_date == datetime.date.today()
+        and (now_clock - actuator.last_seen_clock) <= tolerance
     )
     return ActuatorUpdate(
         device_name=device_name,
-        state=json.dumps(actuator['state']),
-        metadata=json.dumps(actuator['metadata']),
-        timestamp=actuator['timestamp'].isoformat(),
+        state=json.dumps(actuator.current_state),
+        metadata=json.dumps(actuator.current_metadata),
+        timestamp=actuator.timestamp.isoformat(),
         is_online=is_online,
     )
 
 
 def process_set_actuator_state(args, device_name, state_string):
-    if not args.db.is_actuator_registered(device_name):
+    actuators_repository = get_actuator_repository()
+    actuator_id = int(device_name.split('-')[-1])
+    if actuators_repository.get_actuator_by_id(actuator_id) is None:
         return ClientReply(
             status=ReplyStatus.RS_UNKNOWN_DEVICE,
             reply_to=RequestType.RT_SET_ACTUATOR_STATE,
@@ -97,7 +104,9 @@ def process_set_actuator_state(args, device_name, state_string):
 
 
 def process_run_actuator_action(args, device_name, action_name):
-    if not args.db.is_actuator_registered(device_name):
+    actuators_repository = get_actuator_repository()
+    actuator_id = int(device_name.split('-')[-1])
+    if actuators_repository.get_actuator_by_id(actuator_id) is None:
         return ClientReply(
             status=ReplyStatus.RS_UNKNOWN_DEVICE,
             reply_to=RequestType.RT_RUN_ACTUATOR_ACTION,

@@ -2,8 +2,8 @@ import datetime
 from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
-from sessions import SessionMaker
-from models import Sensor, Actuator, Reading
+from .sessions import SessionMaker
+from .models import Sensor, Actuator, Reading
 
 
 def get_sensor_repository():
@@ -30,14 +30,14 @@ class SensorRepository:
                 sensor = Sensor(
                     type=sensor_type,
                     ip_address=ip_address,
-                    metadata=metadata,
+                    current_metadata=metadata,
                 )
                 session.add(sensor)
         else:
             with self.session_maker.begin() as session:
                 sensor = session.merge(sensor)
                 sensor.type = sensor_type
-                sensor.metadata = metadata
+                sensor.current_metadata = metadata
         return sensor
 
     def get_sensor_by_id(self, sensor_id: int):
@@ -49,6 +49,13 @@ class SensorRepository:
         stmt = select(Sensor).where(Sensor.ip_address == ip_address).limit(1)
         with self.session_maker() as session:
             return session.scalars(stmt).first()
+
+    def get_sensor_readings(self, sensor_id: int):
+        with self.session_maker() as session:
+            sensor = session.get(Sensor, sensor_id)
+            if sensor is None:
+                return None
+            return sensor.readings
 
     def get_all_sensors(self):
         stmt = select(Sensor)
@@ -97,9 +104,10 @@ class ActuatorRepository:
         ip_address: str,
         communication_port: int,
         current_state: dict[str, Any],
-        metadata: dict[str, Any]
+        metadata: dict[str, Any],
+        timestamp: datetime.datetime,
     ):
-        actuator = self.get_actuator_by_address(ip_address, communication_port)
+        actuator = self.get_actuator_by_ip_address(ip_address)
         if actuator is None:
             with self.session_maker.begin() as session:
                 actuator = Actuator(
@@ -107,15 +115,18 @@ class ActuatorRepository:
                     ip_address=ip_address,
                     communication_port=communication_port,
                     current_state=current_state,
-                    metadata=metadata,
+                    current_metadata=metadata,
+                    timestamp=timestamp,
                 )
                 session.add(actuator)
         else:
             with self.session_maker.begin() as session:
                 actuator = session.merge(actuator)
                 actuator.type = actuator_type
+                actuator.communication_port = communication_port
                 actuator.current_state = current_state
-                actuator.metadata = metadata
+                actuator.current_metadata = metadata
+                actuator.timestamp = timestamp
         return actuator
 
     def get_actuator_by_id(self, actuator_id: int):
@@ -123,11 +134,8 @@ class ActuatorRepository:
         with self.session_maker() as session:
             return session.scalars(stmt).first()
 
-    def get_actuator_by_address(self, ip_address: str, communication_port: int):
-        stmt = select(Actuator).where(
-            Actuator.ip_address == ip_address,
-            Actuator.communication_port == communication_port,
-        ).limit(1)
+    def get_actuator_by_ip_address(self, ip_address: str):
+        stmt = select(Actuator).where(Actuator.ip_address == ip_address).limit(1)
         with self.session_maker() as session:
             return session.scalars(stmt).first()
 
@@ -154,11 +162,13 @@ class ActuatorRepository:
         actuator_id: int,
         current_state: dict[str, Any],
         metadata: dict[str, Any],
+        timestamp: datetime.datetime,
     ):
         with self.session_maker.begin() as session:
             actuator = session.get(Actuator, actuator_id)
             if actuator is None:
                 return False
             actuator.current_state = current_state
-            actuator.metadata = metadata
+            actuator.current_metadata = metadata
+            actuator.timestamp = timestamp
             return True

@@ -4,6 +4,7 @@ import socket
 import logging
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
+from db.repositories import get_sensor_repository, get_actuator_repository
 from messages_pb2 import Address, JoinRequest, JoinReply, DeviceType
 
 
@@ -41,27 +42,28 @@ def registration_handler(args, sock, address):
         device_addrs = request.device_address
         match request.device_info.type:
             case DeviceType.DT_SENSOR:
+                sensors_repository = get_sensor_repository()
                 report_port = args.sensors_port
                 metadata = json.loads(device_info.metadata)
-                with args.db_sensors_lock:
-                    args.db.register_sensor(
-                        name=device_info.name,
-                        address=(device_addrs.ip, device_addrs.port),
-                        metadata=metadata,
-                    )
+                sensors_repository.add_sensor(
+                    sensor_type='Any',
+                    ip_address=device_addrs.ip,
+                    metadata=metadata,
+                )
             case DeviceType.DT_ACTUATOR:
+                actuators_repository = get_actuator_repository()
                 report_port = args.actuators_port
                 state = json.loads(device_info.state)
                 metadata = json.loads(device_info.metadata)
                 timestamp = datetime.fromisoformat(device_info.timestamp)
-                with args.db_actuators_lock:
-                    args.db.register_actuator(
-                        name=device_info.name,
-                        address=(device_addrs.ip, device_addrs.port),
-                        state=state,
-                        metadata=metadata,
-                        timestamp=timestamp,
-                    )
+                actuators_repository.add_actuator(
+                    actuator_type='Any',
+                    ip_address=device_addrs.ip,
+                    communication_port=device_addrs.port,
+                    current_state=state,
+                    metadata=metadata,
+                    timestamp=timestamp,
+                )
             case _:
                 raise ValueError('Invalid DeviceType')
         reply = JoinReply(report_port=report_port)

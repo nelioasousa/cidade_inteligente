@@ -2,13 +2,15 @@ import json
 import time
 import socket
 import logging
-from datetime import datetime, date
+import datetime
+from db.repositories import get_actuator_repository
 from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import ActuatorUpdate, ActuatorsReport
 from messages_pb2 import CommandType, ActuatorCommand, ActuatorComply
 
 
 def actuators_report_generator(args):
+    actuators_repository = get_actuator_repository()
     logger = logging.getLogger('ACTUATORS_REPORT_GENERATOR')
     logger.info('Iniciando o gerador de relatórios dos atuadores')
     idle_time = 0
@@ -21,32 +23,31 @@ def actuators_report_generator(args):
             idle_time += 1
             continue
         idle_time = 0
-        with args.db_actuators_lock:
-            actuators = args.db.get_actuators_summary()
-            args.pending_actuators_updates.clear()
-        today = date.today()
+        args.pending_actuators_updates.clear()
+        actuators = actuators_repository.get_all_actuators()
+        today = datetime.datetime.now(datetime.UTC).date()
         now_clock = time.monotonic()
         tolerance = args.actuators_tolerance
-        for i, actuator in enumerate(actuators):
-            last_seen = actuator['last_seen']
+        summary = []
+        for actuator in actuators:
             is_online = (
-                last_seen[0] == today
-                and (now_clock - last_seen[1]) <= tolerance
+                actuator.last_seen_date == today
+                and (now_clock - actuator.last_seen_clock) <= tolerance
             )
-            actuators[i] = ActuatorUpdate(
-                device_name=actuator['name'],
-                state=json.dumps(actuator['state']),
-                metadata=json.dumps(actuator['metadata']),
-                timestamp=actuator['timestamp'].isoformat(),
+            summary.append(ActuatorUpdate(
+                device_name=f'{actuator.type}-{actuator.id}',
+                state=json.dumps(actuator.current_state),
+                metadata=json.dumps(actuator.current_metadata),
+                timestamp=actuator.timestamp.isoformat(),
                 is_online=is_online,
-            )
+            ))
         logger.debug(
             'Novo relatório gerado: %d atuadores reportados',
             len(actuators),
         )
-        report = ActuatorsReport(devices=actuators).SerializeToString()
+        report = ActuatorsReport(devices=summary).SerializeToString()
         with args.db_actuators_report_lock:
-            args.db.actuators_report = report
+            args.actuators_report = report
 
 
 def build_command_message(type, body):
@@ -61,13 +62,15 @@ def build_command_message(type, body):
 
 
 def send_actuator_command(args, actuator_name, command_type, command_body):
+    actuators_repository = get_actuator_repository()
     command = build_command_message(command_type, command_body)
     if command is None:
         return None
-    with args.db_actuators_lock:
-        address = args.db.get_actuator_address_by_name(actuator_name)
-    if address is None:
+    actuator_id = int(actuator_name.split('-')[-1])
+    actuator = actuators_repository.get_actuator_by_id(actuator_id)
+    if actuator is None:
         return None
+    address = (actuator.ip_address, actuator.communication_port)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(args.base_timeout)
         try:
@@ -80,15 +83,14 @@ def send_actuator_command(args, actuator_name, command_type, command_body):
     reply.ParseFromString(msg)
     state = json.loads(reply.update.state)
     metadata = json.loads(reply.update.metadata)
-    timestamp = datetime.fromisoformat(reply.update.timestamp)
-    with args.db_actuators_lock:
-        args.db.add_actuator_update(
-            actuator_name,
-            state,
-            metadata,
-            timestamp,
-        )
-        args.pending_actuators_updates.set()
+    timestamp = datetime.datetime.fromisoformat(reply.update.timestamp)
+    actuators_repository.register_actuator_update(
+        actuator_id=actuator_id,
+        current_state=state,
+        metadata=metadata,
+        timestamp=timestamp,
+    )
+    args.pending_actuators_updates.set()
     return reply
 
 
@@ -115,33 +117,28 @@ def actuator_handler(args, sock, address):
             )
         finally:
             sock.close()
-    if not args.db.is_actuator_registered(update.device_name):
-        logger.warning(
-            'Atuador não registrado enviando atualizações: %s',
-            update.device_name,
-        )
-        return
     logger.debug(
         'Atuador %s enviou uma atualização: (%s, %s)',
         update.device_name,
         update.timestamp,
         update.device_name,
     )
+    actuator_id = int(update.device_name.split('-')[-1])
     state = json.loads(update.state)
     metadata = json.loads(update.metadata)
-    timestamp = datetime.fromisoformat(update.timestamp)
-    with args.db_actuators_lock:
-        result = args.db.add_actuator_update(
-            update.device_name,
-            state,
-            metadata,
-            timestamp,
-        )
-        if result:
-            args.pending_actuators_updates.set()
+    timestamp = datetime.datetime.fromisoformat(update.timestamp)
+    actuators_repository = get_actuator_repository()
+    actuators_repository.register_actuator_update(
+        actuator_id=actuator_id,
+        current_state=state,
+        metadata=metadata,
+        timestamp=timestamp,
+    )
+    args.pending_actuators_updates.set()
 
 
 def actuators_listener(args):
+    actuators_repository = get_actuator_repository()
     logger = logging.getLogger('ACTUATORS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -166,9 +163,8 @@ def actuators_listener(args):
                         e,
                     )
                     continue
-                with args.db_actuators_lock:
-                    actuator_name = args.db.get_actuator_name_by_ip(addrs[0])
-                if actuator_name is None:
+                actuator = actuators_repository.get_actuator_by_ip_address(addrs[0])
+                if actuator is None:
                     logger.warning(
                         'Recebendo atualizações de um atuador '
                         'não registrado localizado em %s',

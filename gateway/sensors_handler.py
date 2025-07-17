@@ -2,43 +2,50 @@ import json
 import time
 import socket
 import logging
-from datetime import date, datetime
+import datetime
+from db.repositories import get_sensor_repository
 from messages_pb2 import SensorReading, SensorsReport
 
 
 def sensors_report_generator(args):
+    sensors_repository = get_sensor_repository()
     logger = logging.getLogger('SENSORS_REPORT_GENERATOR')
     logger.info('Iniciando o gerador de relatórios dos sensores')
     while not args.stop_flag.is_set():
-        with args.db_sensors_lock:
-            sensors = args.db.get_sensors_summary()
-        today = date.today()
+        sensors = sensors_repository.get_all_sensors()
+        today = datetime.datetime.now(datetime.UTC).date()
         now_clock = time.monotonic()
         tolerance = args.sensors_tolerance
-        for i, sensor_summary in enumerate(sensors):
-            last_seen = sensor_summary['last_seen']
+        summary = []
+        for sensor in sensors:
+            readings = sensors_repository.get_sensor_readings(sensor.id)
+            try:
+                last_reading = readings[-1]
+            except IndexError:
+                continue
             is_online = (
-                last_seen[0] == today
-                and (now_clock - last_seen[1]) <= tolerance
+                sensor.last_seen_date == today
+                and (now_clock - sensor.last_seen_clock) <= tolerance
             )
-            sensors[i] = SensorReading(
-                device_name=sensor_summary['device_name'],
-                reading_value=sensor_summary['reading_value'],
-                timestamp=sensor_summary['timestamp'].isoformat(),
-                metadata=json.dumps(sensor_summary['metadata']),
+            summary.append(SensorReading(
+                device_name=f'{sensor.type}-{sensor.id}',
+                reading_value=last_reading.value,
+                timestamp=last_reading.timestamp.isoformat(),
+                metadata=json.dumps(sensor.current_metadata),
                 is_online=is_online,
-            )
+            ))
         logger.debug(
             'Novo relatório gerado: %d sensores reportados',
             len(sensors),
         )
-        report = SensorsReport(devices=sensors).SerializeToString()
+        report = SensorsReport(devices=summary).SerializeToString()
         with args.db_sensors_report_lock:
-            args.db.sensors_report = report
+            args.sensors_report = report
         time.sleep(args.reports_gen_interval)
 
 
 def sensors_listener(args):
+    sensors_repository = get_sensor_repository()
     logger = logging.getLogger('SENSORS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -62,9 +69,8 @@ def sensors_listener(args):
                 msg, addrs = sock.recvfrom(1024)
             except TimeoutError:
                 continue
-            with args.db_sensors_lock:
-                sensor_name = args.db.get_sensor_name_by_ip(addrs[0])
-            if sensor_name is None:
+            sensor = sensors_repository.get_sensor_by_ip_address(addrs[0])
+            if sensor is None:
                 logger.warning(
                     'Recebendo leituras de um sensor '
                     'não registrado localizado em %s',
@@ -79,12 +85,7 @@ def sensors_listener(args):
                 reading.device_name,
                 reading.reading_value,
             )
-            metadata = json.loads(reading.metadata)
-            timestamp = datetime.fromisoformat(reading.timestamp)
-            with args.db_sensors_lock:
-                args.db.add_sensor_reading(
-                    reading.device_name,
-                    reading.reading_value,
-                    metadata,
-                    timestamp,
-                )
+            timestamp = datetime.datetime.fromisoformat(reading.timestamp)
+            sensors_repository.register_sensor_reading(
+                sensor.ip_address, reading.reading_value, timestamp
+            )

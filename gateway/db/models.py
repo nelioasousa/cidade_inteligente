@@ -23,13 +23,13 @@ class Sensor(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     type: Mapped[str] = mapped_column(String, nullable=False)
     ip_address: Mapped[str] = mapped_column(String, nullable=False)
-    metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
+    current_metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
 
     last_seen_date: Mapped[datetime.date] = mapped_column(
-        Date, nullable=False, default_factory=last_seen_date_factory,
+        Date, nullable=False, default=last_seen_date_factory,
     )
     last_seen_clock: Mapped[float] = mapped_column(
-        Float, nullable=False, default_factory=time.monotonic,
+        Float, nullable=False, default=time.monotonic,
     )
 
     readings: Mapped[list['Reading']] = relationship(back_populates='sensor')
@@ -70,14 +70,14 @@ class Actuator(Base):
     ip_address: Mapped[str] = mapped_column(String, nullable=False)
     communication_port: Mapped[int] = mapped_column(Integer, nullable=False)
     current_state: Mapped[dict] = mapped_column(JSON, nullable=False)
-    metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
+    current_metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
     timestamp: Mapped[datetime.datetime] = mapped_column(UTCDateTime, nullable=False)
 
     last_seen_date: Mapped[datetime.date] = mapped_column(
-        Date, nullable=False, default_factory=last_seen_date_factory,
+        Date, nullable=False, default=last_seen_date_factory,
     )
     last_seen_clock: Mapped[float] = mapped_column(
-        Float, nullable=False, default_factory=time.monotonic,
+        Float, nullable=False, default=time.monotonic,
     )
 
     def mark_as_seen(self):
