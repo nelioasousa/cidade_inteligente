@@ -1,102 +1,109 @@
-from contextlib import contextmanager
-from sqlalchemy import select, update, insert
-from sqlalchemy.orm import Session
-from sessions import get_session
+from sqlalchemy import select
+from sqlalchemy.orm import sessionmaker
+from sessions import SessionMaker
 from models import Sensor, Actuator
 
 
-@contextmanager
 def get_sensor_repository():
-    session = get_session()
-    try:
-        yield SensorRepository(session)
-    finally:
-        session.close()
+    return SensorRepository(SessionMaker)
 
 
-@contextmanager
 def get_actuator_repository():
-    session = get_session()
-    try:
-        yield ActuatorRepository(session)
-    finally:
-        session.close()
+    return ActuatorRepository(SessionMaker)
 
 
 class SensorRepository:
-    def __init__(self, session: Session):
-        self.session = session
+    def __init__(self, session_maker: sessionmaker):
+        self.session_maker = session_maker
 
-    def add_sensor(self, sensor_id: int, sensor_type: str, metadata: dict):
-        sensor = self.get_sensor(sensor_id, sensor_type)
+    def add_sensor(self, sensor_type: str, ip_address: str, metadata: dict):
+        sensor = self.get_sensor_by_ip_address(ip_address)
         if sensor is None:
-            stmt = insert(Sensor).values(
-                device_id=sensor_id,
-                device_type=sensor_type,
-                metadata=metadata,
-            )
+            with self.session_maker.begin() as session:
+                sensor = Sensor(
+                    type=sensor_type,
+                    ip_address=ip_address,
+                    metadata=metadata,
+                )
+                session.add(sensor)
         else:
-            stmt = update(Sensor).where(
-                Sensor.device_id == sensor_id,
-                Sensor.device_type == sensor_type,
-            ).values(metadata=metadata)
-        with self.session.begin():
-            self.session.execute(stmt)
-        return self.get_sensor(sensor_id, sensor_type)
+            with self.session_maker.begin() as session:
+                sensor = session.merge(sensor)
+                sensor.type = sensor_type
+                sensor.metadata = metadata
+        return sensor
 
-    def get_sensor(self, sensor_id: int, sensor_type: str):
-        stmt = select(Sensor).where(
-            Sensor.device_id == sensor_id,
-            Sensor.device_type == sensor_type,
-        )
-        return self.session.scalars(stmt).first()
+    def get_sensor_by_id(self, sensor_id: int):
+        stmt = select(Sensor).where(Sensor.id == sensor_id).limit(1)
+        with self.session_maker() as session:
+            return session.scalars(stmt).first()
+
+    def get_sensor_by_ip_address(self, ip_address: str):
+        stmt = select(Sensor).where(Sensor.ip_address == ip_address).limit(1)
+        with self.session_maker() as session:
+            return session.scalars(stmt).first()
 
     def get_all_sensors(self):
-        return self.session.scalars(select(Sensor)).all()
+        stmt = select(Sensor)
+        with self.session_maker() as session:
+            return session.scalars(stmt).all()
 
     def get_sensors_by_type(self, sensor_type: str):
-        stmt = select(Sensor).where(Sensor.device_type == sensor_type)
-        return self.session.scalars(stmt).all()
+        stmt = select(Sensor).where(Sensor.type == sensor_type)
+        with self.session_maker() as session:
+            return session.scalars(stmt).all()
 
 
 class ActuatorRepository:
-    def __init__(self, session: Session):
-        self.session = session
+    def __init__(self, session_maker: sessionmaker):
+        self.session_maker = session_maker
 
     def add_actuator(
         self,
-        actuator_id: int,
         actuator_type: str,
+        ip_address: str,
+        communication_port: int,
         current_state: dict,
         metadata: dict
     ):
-        actuator = self.get_actuator(actuator_id, actuator_type)
+        actuator = self.get_actuator_by_address(ip_address, communication_port)
         if actuator is None:
-            stmt = insert(Actuator).values(
-                device_id=actuator_id,
-                device_type=actuator_type,
-                current_state=current_state,
-                metadata=metadata,
-            )
+            with self.session_maker.begin() as session:
+                actuator = Actuator(
+                    type=actuator_type,
+                    ip_address=ip_address,
+                    communication_port=communication_port,
+                    current_state=current_state,
+                    metadata=metadata,
+                )
+                session.add(actuator)
         else:
-            stmt = update(Actuator).where(
-                Actuator.device_id == actuator_id,
-                Actuator.device_type == actuator_type,
-            ).values(current_state=current_state, metadata=metadata)
-        with self.session.begin():
-            self.session.execute(stmt)
-        return self.get_actuator(actuator_id, actuator_type)
+            with self.session_maker.begin() as session:
+                actuator = session.merge(actuator)
+                actuator.type = actuator_type
+                actuator.current_state = current_state
+                actuator.metadata = metadata
+        return actuator
 
-    def get_actuator(self, actuator_id: int, actuator_type: str):
+    def get_actuator_by_id(self, actuator_id: int):
+        stmt = select(Actuator).where(Actuator.id == actuator_id).limit(1)
+        with self.session_maker() as session:
+            return session.scalars(stmt).first()
+
+    def get_actuator_by_address(self, ip_address: str, communication_port: int):
         stmt = select(Actuator).where(
-            Actuator.device_id == actuator_id,
-            Actuator.device_type == actuator_type,
-        )
-        return self.session.scalars(stmt).first()
+            Actuator.ip_address == ip_address,
+            Actuator.communication_port == communication_port,
+        ).limit(1)
+        with self.session_maker() as session:
+            return session.scalars(stmt).first()
 
     def get_all_actuators(self):
-        return self.session.scalars(select(Actuator)).all()
+        stmt = select(Actuator)
+        with self.session_maker() as session:
+            return session.scalars(stmt).all()
 
     def get_actuators_by_type(self, actuator_type: str):
-        stmt = select(Actuator).where(Actuator.device_type == actuator_type)
-        return self.session.scalars(stmt).all()
+        stmt = select(Actuator).where(Actuator.type == actuator_type)
+        with self.session_maker() as session:
+            return session.scalars(stmt).all()

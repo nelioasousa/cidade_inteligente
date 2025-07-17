@@ -7,7 +7,10 @@ from models import Base
 
 DB_FILE = 'local.db'
 
-ENGINE = create_engine(f'sqlite:///{DB_FILE}')
+ENGINE = create_engine(
+    f'sqlite:///{DB_FILE}',
+    connect_args={'check_same_thread': False},
+)
 
 SessionMaker = sessionmaker(ENGINE)
 
