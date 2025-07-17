@@ -53,6 +53,14 @@ class SensorRepository:
         with self.session_maker() as session:
             return session.scalars(stmt).all()
 
+    def mark_sensor_as_seen(self, sensor_id: int):
+        with self.session_maker.begin() as session:
+            sensor = session.get(Sensor, sensor_id)
+            if sensor is None:
+                return False
+            sensor.mark_as_seen()
+            return True
+
 
 class ActuatorRepository:
     def __init__(self, session_maker: sessionmaker):
@@ -107,3 +115,11 @@ class ActuatorRepository:
         stmt = select(Actuator).where(Actuator.type == actuator_type)
         with self.session_maker() as session:
             return session.scalars(stmt).all()
+
+    def mark_actuator_as_seen(self, actuator_id: int):
+        with self.session_maker.begin() as session:
+            actuator = session.get(Actuator, actuator_id)
+            if actuator is None:
+                return False
+            actuator.mark_as_seen()
+            return True

@@ -34,6 +34,11 @@ class Sensor(Base):
 
     readings: Mapped[list['Reading']] = relationship(back_populates='sensor')
 
+    def mark_as_seen(self):
+        self.last_seen_date = last_seen_date_factory()
+        self.last_seen_clock = time.monotonic()
+        return
+
 
 class UTCDateTime(TypeDecorator):
 
@@ -74,3 +79,8 @@ class Actuator(Base):
     last_seen_clock: Mapped[float] = mapped_column(
         Float, nullable=False, default_factory=time.monotonic,
     )
+
+    def mark_as_seen(self):
+        self.last_seen_date = last_seen_date_factory()
+        self.last_seen_clock = time.monotonic()
+        return
