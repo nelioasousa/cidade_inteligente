@@ -1,8 +1,9 @@
+import datetime
 from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 from sessions import SessionMaker
-from models import Sensor, Actuator
+from models import Sensor, Actuator, Reading
 
 
 def get_sensor_repository():
@@ -65,6 +66,24 @@ class SensorRepository:
             if sensor is None:
                 return False
             sensor.mark_as_seen()
+            return True
+
+    def register_sensor_reading(
+        self,
+        sensor_ip_address: str,
+        reading_value: float,
+        reading_timestamp: datetime.datetime,
+    ):
+        sensor = self.get_sensor_by_ip_address(sensor_ip_address)
+        if sensor is None:
+            return False
+        with self.session_maker.begin() as session:
+            reading = Reading(
+                value=reading_value,
+                timestamp=reading_timestamp,
+                sensor_id=sensor.id,
+            )
+            session.add(reading)
             return True
 
 
