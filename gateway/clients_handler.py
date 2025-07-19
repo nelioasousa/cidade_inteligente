@@ -6,7 +6,7 @@ import datetime
 from struct import pack
 from actuators_handler import send_actuator_command
 from concurrent.futures import ThreadPoolExecutor
-from db.repositories import get_sensor_repository, get_actuator_repository
+from db.repositories import get_sensors_repository, get_actuators_repository
 from messages_pb2 import SensorData
 from messages_pb2 import RequestType, ClientRequest
 from messages_pb2 import ReplyStatus, ClientReply
@@ -24,7 +24,7 @@ def get_actuators_report(args):
 
 
 def build_sensor_data(args, device_name):
-    sensors_repository = get_sensor_repository()
+    sensors_repository = get_sensors_repository()
     sensor_id = int(device_name.split('-')[-1])
     sensor = sensors_repository.get_sensor_by_id(sensor_id)
     if sensor is None:
@@ -52,7 +52,7 @@ def build_sensor_data(args, device_name):
 
 
 def build_actuator_update(args, device_name):
-    actuators_repository = get_actuator_repository()
+    actuators_repository = get_actuators_repository()
     actuator_id = int(device_name.split('-')[-1])
     actuator = actuators_repository.get_actuator_by_id(actuator_id)
     if actuator is None:
@@ -73,7 +73,7 @@ def build_actuator_update(args, device_name):
 
 
 def process_set_actuator_state(args, device_name, state_string):
-    actuators_repository = get_actuator_repository()
+    actuators_repository = get_actuators_repository()
     actuator_id = int(device_name.split('-')[-1])
     if actuators_repository.get_actuator_by_id(actuator_id) is None:
         return ClientReply(
@@ -104,7 +104,7 @@ def process_set_actuator_state(args, device_name, state_string):
 
 
 def process_run_actuator_action(args, device_name, action_name):
-    actuators_repository = get_actuator_repository()
+    actuators_repository = get_actuators_repository()
     actuator_id = int(device_name.split('-')[-1])
     if actuators_repository.get_actuator_by_id(actuator_id) is None:
         return ClientReply(

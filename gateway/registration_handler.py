@@ -4,7 +4,7 @@ import socket
 import logging
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
-from db.repositories import get_sensor_repository, get_actuator_repository
+from db.repositories import get_sensors_repository, get_actuators_repository
 from messages_pb2 import Address, JoinRequest, JoinReply, DeviceType
 
 
@@ -42,7 +42,7 @@ def registration_handler(args, sock, address):
         device_addrs = request.device_address
         match request.device_info.type:
             case DeviceType.DT_SENSOR:
-                sensors_repository = get_sensor_repository()
+                sensors_repository = get_sensors_repository()
                 report_port = args.sensors_port
                 metadata = json.loads(device_info.metadata)
                 sensors_repository.add_sensor(
@@ -51,7 +51,7 @@ def registration_handler(args, sock, address):
                     device_metadata=metadata,
                 )
             case DeviceType.DT_ACTUATOR:
-                actuators_repository = get_actuator_repository()
+                actuators_repository = get_actuators_repository()
                 report_port = args.actuators_port
                 state = json.loads(device_info.state)
                 metadata = json.loads(device_info.metadata)

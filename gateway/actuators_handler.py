@@ -3,14 +3,14 @@ import time
 import socket
 import logging
 import datetime
-from db.repositories import get_actuator_repository
+from db.repositories import get_actuators_repository
 from concurrent.futures import ThreadPoolExecutor
 from messages_pb2 import ActuatorUpdate, ActuatorsReport
 from messages_pb2 import CommandType, ActuatorCommand, ActuatorComply
 
 
 def actuators_report_generator(args):
-    actuators_repository = get_actuator_repository()
+    actuators_repository = get_actuators_repository()
     logger = logging.getLogger('ACTUATORS_REPORT_GENERATOR')
     logger.info('Iniciando o gerador de relatórios dos atuadores')
     idle_time = 0
@@ -62,7 +62,7 @@ def build_command_message(type, body):
 
 
 def send_actuator_command(args, actuator_name, command_type, command_body):
-    actuators_repository = get_actuator_repository()
+    actuators_repository = get_actuators_repository()
     command = build_command_message(command_type, command_body)
     if command is None:
         return None
@@ -127,7 +127,7 @@ def actuator_handler(args, sock, address):
     state = json.loads(update.state)
     metadata = json.loads(update.metadata)
     timestamp = datetime.datetime.fromisoformat(update.timestamp)
-    actuators_repository = get_actuator_repository()
+    actuators_repository = get_actuators_repository()
     actuators_repository.register_actuator_update(
         actuator_id=actuator_id,
         device_state=state,
@@ -138,7 +138,7 @@ def actuator_handler(args, sock, address):
 
 
 def actuators_listener(args):
-    actuators_repository = get_actuator_repository()
+    actuators_repository = get_actuators_repository()
     logger = logging.getLogger('ACTUATORS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

@@ -6,11 +6,11 @@ from .sessions import SessionMaker
 from .models import Sensor, Actuator, Reading
 
 
-def get_sensor_repository():
+def get_sensors_repository():
     return SensorRepository(SessionMaker)
 
 
-def get_actuator_repository():
+def get_actuators_repository():
     return ActuatorRepository(SessionMaker)
 
 

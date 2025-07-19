@@ -3,12 +3,12 @@ import time
 import socket
 import logging
 import datetime
-from db.repositories import get_sensor_repository
+from db.repositories import get_sensors_repository
 from messages_pb2 import SensorReading, SensorsReport
 
 
 def sensors_report_generator(args):
-    sensors_repository = get_sensor_repository()
+    sensors_repository = get_sensors_repository()
     logger = logging.getLogger('SENSORS_REPORT_GENERATOR')
     logger.info('Iniciando o gerador de relatórios dos sensores')
     while not args.stop_flag.is_set():
@@ -45,7 +45,7 @@ def sensors_report_generator(args):
 
 
 def sensors_listener(args):
-    sensors_repository = get_sensor_repository()
+    sensors_repository = get_sensors_repository()
     logger = logging.getLogger('SENSORS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
