@@ -2,12 +2,13 @@ import sys
 import socket
 import threading
 import logging
-from db import Database
+from db.sessions import init_db
 from registration_handler import multicast_location, registration_listener
 from sensors_handler import sensors_listener, sensors_report_generator
 from actuators_handler import actuators_listener, actuators_report_generator
 from clients_handler import clients_listener
 from functools import wraps
+from messages_pb2 import SensorsReport, ActuatorsReport
 
 
 def stop_wrapper(func, stop_flag):
@@ -68,7 +69,6 @@ def _run(args):
         multicaster.join()
         sgenerator.join()
         agenerator.join()
-        args.db.persist()
 
 
 def main():
@@ -133,8 +133,10 @@ def main():
     # Host IP
     args.host_ip = socket.gethostbyname('localhost')
 
-    # Database and stop event
-    args.db = Database(clear=args.clear)
+    # Database
+    init_db(args.clear)
+
+    # Stop event
     args.stop_flag = threading.Event()
 
     # Reports
@@ -142,15 +144,15 @@ def main():
 
     # Sensors utilities
     args.sensors_tolerance = 6.0
-    args.db_sensors_lock = threading.Lock()
     args.db_sensors_report_lock = threading.Lock()
+    args.sensors_report = SensorsReport(devices=[]).SerializeToString(),
 
     # Actuators utilities
     args.actuators_tolerance = 6.0
     args.pending_actuators_updates = threading.Event()
     args.pending_actuators_updates.set()
-    args.db_actuators_lock = threading.Lock()
     args.db_actuators_report_lock = threading.Lock()
+    args.actuators_report = ActuatorsReport(devices=[]).SerializeToString(),
 
     return _run(args)
 

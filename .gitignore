@@ -6,6 +6,7 @@ venv/
 
 # Outros
 db.pickle
+local.db
 
 # Node
 devices/lamp_node/package-lock.json

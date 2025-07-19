@@ -166,7 +166,7 @@ def main():
     parser = argparse.ArgumentParser(description='Sensor de temperatura')
 
     parser.add_argument(
-        '--name', type=str, default='01',
+        '--id', type=int, default=1,
         help='Nome que unicamente identifica o sensor de temperatura.'
     )
 
@@ -217,7 +217,7 @@ def main():
     args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
 
     # Identifier
-    args.name = f'Temp-{args.name}'
+    args.name = f'temperature-{args.id}'
 
     # Timeouts
     args.base_timeout = 2.0

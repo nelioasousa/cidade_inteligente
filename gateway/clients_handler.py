@@ -6,6 +6,7 @@ import datetime
 from struct import pack
 from actuators_handler import send_actuator_command
 from concurrent.futures import ThreadPoolExecutor
+from db.repositories import get_sensors_repository, get_actuators_repository
 from messages_pb2 import SensorData
 from messages_pb2 import RequestType, ClientRequest
 from messages_pb2 import ReplyStatus, ClientReply
@@ -14,68 +15,77 @@ from messages_pb2 import ActuatorUpdate, CommandType, ComplyStatus
 
 def get_sensors_report(args):
     with args.db_sensors_report_lock:
-        return args.db.sensors_report
+        return args.sensors_report
 
 
 def get_actuators_report(args):
     with args.db_actuators_report_lock:
-        return args.db.actuators_report
+        return args.actuators_report
 
 
 def build_sensor_data(args, device_name):
-    with args.db_sensors_lock:
-        sensor = args.db.get_sensor(device_name)
+    sensors_repository = get_sensors_repository()
+    sensor_category, sensor_id = device_name.split('-')
+    sensor_id = int(sensor_id)
+    sensor = sensors_repository.get_sensor(sensor_id, sensor_category)
     if sensor is None:
         return None
+    readings = sensors_repository.get_sensor_readings(sensor.id, sensor.category)
     readings = [
         SensorData.SimpleReading(
-            timestamp=timestamp.isoformat(), reading_value=reading,
+            timestamp=reading.timestamp.isoformat(),
+            reading_value=reading.value,
         )
-        for timestamp, reading in sensor['data']
+        for reading in readings
     ]
-    ls_day, ls_clock = sensor['last_seen']
+    ls_date = sensor.last_seen_date
+    ls_clock = sensor.last_seen_clock
     is_online = (
-        ls_day == datetime.date.today()
+        ls_date == datetime.datetime.now(datetime.UTC).date()
         and (time.monotonic() - ls_clock) <= args.sensors_tolerance
     )
     return SensorData(
         device_name=device_name,
-        metadata=json.dumps(sensor['metadata']),
+        metadata=json.dumps(sensor.device_metadata),
         readings=readings,
         is_online=is_online,
     )
 
 
 def build_actuator_update(args, device_name):
-    with args.db_actuators_lock:
-        actuator = args.db.get_actuator(device_name)
+    actuators_repository = get_actuators_repository()
+    actuator_category, actuator_id = device_name.split('-')
+    actuator_id = int(actuator_id)
+    actuator = actuators_repository.get_actuator(actuator_id, actuator_category)
     if actuator is None:
         return None
-    now_clock = time.monotonic()
-    tolerance = args.actuators_tolerance
-    last_seen = actuator['last_seen']
     is_online = (
-        last_seen[0] == datetime.date.today()
-        and (now_clock - last_seen[1]) <= tolerance
+        actuator.last_seen_date == datetime.datetime.now(datetime.UTC).date()
+        and (time.monotonic() - actuator.last_seen_clock) <= args.actuators_tolerance
     )
     return ActuatorUpdate(
         device_name=device_name,
-        state=json.dumps(actuator['state']),
-        metadata=json.dumps(actuator['metadata']),
-        timestamp=actuator['timestamp'].isoformat(),
+        state=json.dumps(actuator.device_state),
+        metadata=json.dumps(actuator.device_metadata),
+        timestamp=actuator.timestamp.isoformat(),
         is_online=is_online,
     )
 
 
 def process_set_actuator_state(args, device_name, state_string):
-    if not args.db.is_actuator_registered(device_name):
+    actuators_repository = get_actuators_repository()
+    actuator_category, actuator_id = device_name.split('-')
+    actuator_id = int(actuator_id)
+    actuator = actuators_repository.get_actuator(actuator_id, actuator_category)
+    if actuator is None:
         return ClientReply(
             status=ReplyStatus.RS_UNKNOWN_DEVICE,
             reply_to=RequestType.RT_SET_ACTUATOR_STATE,
         )
     comply_msg = send_actuator_command(
         args=args,
-        actuator_name=device_name,
+        actuator_id=actuator_id,
+        actuator_category=actuator_category,
         command_type=CommandType.CT_SET_STATE,
         command_body=state_string,
     )
@@ -89,6 +99,7 @@ def process_set_actuator_state(args, device_name, state_string):
             status=ReplyStatus.RS_INVALID_STATE,
             reply_to=RequestType.RT_SET_ACTUATOR_STATE,
         )
+    comply_msg.update.is_online = True
     return ClientReply(
         status=ReplyStatus.RS_OK,
         reply_to=RequestType.RT_SET_ACTUATOR_STATE,
@@ -97,14 +108,19 @@ def process_set_actuator_state(args, device_name, state_string):
 
 
 def process_run_actuator_action(args, device_name, action_name):
-    if not args.db.is_actuator_registered(device_name):
+    actuators_repository = get_actuators_repository()
+    actuator_category, actuator_id = device_name.split('-')
+    actuator_id = int(actuator_id)
+    actuator = actuators_repository.get_actuator(actuator_id, actuator_category)
+    if actuator is None:
         return ClientReply(
             status=ReplyStatus.RS_UNKNOWN_DEVICE,
             reply_to=RequestType.RT_RUN_ACTUATOR_ACTION,
         )
     comply_msg = send_actuator_command(
         args=args,
-        actuator_name=device_name,
+        actuator_id=actuator_id,
+        actuator_category=actuator_category,
         command_type=CommandType.CT_ACTION,
         command_body=action_name,
     )

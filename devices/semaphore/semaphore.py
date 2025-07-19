@@ -393,7 +393,7 @@ def main():
     parser = argparse.ArgumentParser(description='Simulador de semáforo')
 
     parser.add_argument(
-        '--name', type=str, default='01',
+        '--id', type=int, default=1,
         help='Nome que unicamente identifica o semáforo.'
     )
 
@@ -429,7 +429,7 @@ def main():
     args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
     
     # Identifier
-    args.name = f'Sema-{args.name}'
+    args.name = f'semaphore-{args.id}'
 
     # Timeouts
     args.base_timeout = 2.0
