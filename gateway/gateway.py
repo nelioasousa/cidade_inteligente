@@ -2,12 +2,13 @@ import sys
 import socket
 import threading
 import logging
-from db.sessions import init_db
+from functools import wraps
+from api import app
 from registration_handler import multicast_location, registration_listener
 from sensors_handler import sensors_listener
 from actuators_handler import actuators_listener
 from clients_handler import clients_listener
-from functools import wraps
+from db.sessions import init_db
 
 
 def stop_wrapper(func, stop_flag):
@@ -39,6 +40,10 @@ def _run(args):
             target=stop_wrapper(actuators_listener, args.stop_flag),
             args=(args,)
         )
+        clistener = threading.Thread(
+            target=stop_wrapper(clients_listener, args.stop_flag),
+            args=(args,)
+        )
         multicaster = threading.Thread(
             target=stop_wrapper(multicast_location, args.stop_flag),
             args=(args,)
@@ -46,15 +51,15 @@ def _run(args):
         rlistener.start()
         slistener.start()
         alistener.start()
+        clistener.start()
         multicaster.start()
-        clients_listener(args)
-    except KeyboardInterrupt:
-        print('\nSHUTTING DOWN...')
+        app.run(port=8080)
     finally:
         args.stop_flag.set()
         rlistener.join()
         slistener.join()
         alistener.join()
+        clistener.join()
         multicaster.join()
 
 
