@@ -85,12 +85,14 @@ class SensorRepository:
         if sensor is None:
             return False
         with self.session_maker.begin() as session:
+            sensor = session.merge(sensor)
             reading = Reading(
                 value=reading_value,
                 timestamp=reading_timestamp,
                 sensor_id=sensor.id,
             )
             session.add(reading)
+            sensor.mark_as_seen()
             return True
 
 
@@ -168,7 +170,9 @@ class ActuatorRepository:
             actuator = session.get(Actuator, actuator_id)
             if actuator is None:
                 return False
-            actuator.device_state = device_state
-            actuator.device_metadata = device_metadata
-            actuator.timestamp = timestamp
+            if timestamp > actuator.timestamp:
+                actuator.device_state = device_state
+                actuator.device_metadata = device_metadata
+                actuator.timestamp = timestamp
+                actuator.mark_as_seen()
             return True
