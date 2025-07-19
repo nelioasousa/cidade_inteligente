@@ -56,6 +56,14 @@ class SensorRepository:
         readings.sort(key=(lambda x: x.timestamp))
         return readings
 
+    def get_sensor_last_reading(self, sensor_id: int, sensor_category: str):
+        stmt = select(Reading).where(
+            Reading.sensor_id == sensor_id,
+            Reading.sensor_category == sensor_category,
+        ).order_by(Reading.timestamp.desc()).limit(1)
+        with self.session_maker() as session:
+            return session.scalars(stmt).first()
+
     def get_all_sensors(self):
         stmt = select(Sensor)
         with self.session_maker() as session:

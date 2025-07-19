@@ -44,6 +44,8 @@ class UTCDateTime(TypeDecorator):
 
     impl = DateTime
 
+    cache_ok = True
+
     def process_bind_param(self, value, dialect):
         return value.replace(tzinfo=None)
 

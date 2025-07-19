@@ -7,20 +7,56 @@ from struct import pack
 from actuators_handler import send_actuator_command
 from concurrent.futures import ThreadPoolExecutor
 from db.repositories import get_sensors_repository, get_actuators_repository
-from messages_pb2 import SensorData
+from messages_pb2 import SensorReading, SensorData
+from messages_pb2 import SensorsReport, ActuatorsReport
 from messages_pb2 import RequestType, ClientRequest
 from messages_pb2 import ReplyStatus, ClientReply
 from messages_pb2 import ActuatorUpdate, CommandType, ComplyStatus
 
 
 def get_sensors_report(args):
-    with args.db_sensors_report_lock:
-        return args.sensors_report
+    sensors_repository = get_sensors_repository()
+    sensors = sensors_repository.get_all_sensors()
+    today = datetime.datetime.now(datetime.UTC).date()
+    now_clock = time.monotonic()
+    sensors_summary = []
+    for sensor in sensors:
+        reading = sensors_repository.get_sensor_last_reading(sensor.id, sensor.category)
+        if reading is None:
+            continue
+        is_online = (
+            sensor.last_seen_date == today
+            and (now_clock - sensor.last_seen_clock) <= args.sensors_tolerance
+        )
+        sensors_summary.append(SensorReading(
+            device_name=f'{sensor.category}-{sensor.id}',
+            reading_value=reading.value,
+            timestamp=reading.timestamp.isoformat(),
+            metadata=json.dumps(sensor.device_metadata),
+            is_online=is_online,
+        ))
+    return SensorsReport(devices=sensors_summary).SerializeToString()
 
 
 def get_actuators_report(args):
-    with args.db_actuators_report_lock:
-        return args.actuators_report
+    actuators_repository = get_actuators_repository()
+    actuators = actuators_repository.get_all_actuators()
+    today = datetime.datetime.now(datetime.UTC).date()
+    now_clock = time.monotonic()
+    actuators_summary = []
+    for actuator in actuators:
+        is_online = (
+            actuator.last_seen_date == today
+            and (now_clock - actuator.last_seen_clock) <= args.actuators_tolerance
+        )
+        actuators_summary.append(ActuatorUpdate(
+            device_name=f'{actuator.category}-{actuator.id}',
+            state=json.dumps(actuator.device_state),
+            metadata=json.dumps(actuator.device_metadata),
+            timestamp=actuator.timestamp.isoformat(),
+            is_online=is_online,
+        ))
+    return ActuatorsReport(devices=actuators_summary).SerializeToString()
 
 
 def build_sensor_data(args, device_name):

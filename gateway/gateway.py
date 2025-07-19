@@ -4,11 +4,10 @@ import threading
 import logging
 from db.sessions import init_db
 from registration_handler import multicast_location, registration_listener
-from sensors_handler import sensors_listener, sensors_report_generator
-from actuators_handler import actuators_listener, actuators_report_generator
+from sensors_handler import sensors_listener
+from actuators_handler import actuators_listener
 from clients_handler import clients_listener
 from functools import wraps
-from messages_pb2 import SensorsReport, ActuatorsReport
 
 
 def stop_wrapper(func, stop_flag):
@@ -44,20 +43,10 @@ def _run(args):
             target=stop_wrapper(multicast_location, args.stop_flag),
             args=(args,)
         )
-        sgenerator = threading.Thread(
-            target=stop_wrapper(sensors_report_generator, args.stop_flag),
-            args=(args,)
-        )
-        agenerator = threading.Thread(
-            target=stop_wrapper(actuators_report_generator, args.stop_flag),
-            args=(args,)
-        )
         rlistener.start()
         slistener.start()
         alistener.start()
         multicaster.start()
-        sgenerator.start()
-        agenerator.start()
         clients_listener(args)
     except KeyboardInterrupt:
         print('\nSHUTTING DOWN...')
@@ -67,8 +56,6 @@ def _run(args):
         slistener.join()
         alistener.join()
         multicaster.join()
-        sgenerator.join()
-        agenerator.join()
 
 
 def main():
@@ -139,20 +126,9 @@ def main():
     # Stop event
     args.stop_flag = threading.Event()
 
-    # Reports
-    args.reports_gen_interval = 5
-
-    # Sensors utilities
+    # Tolerances
     args.sensors_tolerance = 6.0
-    args.db_sensors_report_lock = threading.Lock()
-    args.sensors_report = SensorsReport(devices=[]).SerializeToString(),
-
-    # Actuators utilities
     args.actuators_tolerance = 6.0
-    args.pending_actuators_updates = threading.Event()
-    args.pending_actuators_updates.set()
-    args.db_actuators_report_lock = threading.Lock()
-    args.actuators_report = ActuatorsReport(devices=[]).SerializeToString(),
 
     return _run(args)
 

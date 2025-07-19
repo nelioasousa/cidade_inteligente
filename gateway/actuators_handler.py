@@ -5,49 +5,8 @@ import logging
 import datetime
 from db.repositories import get_actuators_repository
 from concurrent.futures import ThreadPoolExecutor
-from messages_pb2 import ActuatorUpdate, ActuatorsReport
+from messages_pb2 import ActuatorUpdate
 from messages_pb2 import CommandType, ActuatorCommand, ActuatorComply
-
-
-def actuators_report_generator(args):
-    actuators_repository = get_actuators_repository()
-    logger = logging.getLogger('ACTUATORS_REPORT_GENERATOR')
-    logger.info('Iniciando o gerador de relatórios dos atuadores')
-    idle_time = 0
-    while not args.stop_flag.is_set():
-        if (
-            not args.pending_actuators_updates.is_set()
-            and idle_time < args.reports_gen_interval
-        ):
-            time.sleep(1.0)
-            idle_time += 1
-            continue
-        idle_time = 0
-        args.pending_actuators_updates.clear()
-        actuators = actuators_repository.get_all_actuators()
-        today = datetime.datetime.now(datetime.UTC).date()
-        now_clock = time.monotonic()
-        tolerance = args.actuators_tolerance
-        summary = []
-        for actuator in actuators:
-            is_online = (
-                actuator.last_seen_date == today
-                and (now_clock - actuator.last_seen_clock) <= tolerance
-            )
-            summary.append(ActuatorUpdate(
-                device_name=f'{actuator.category}-{actuator.id}',
-                state=json.dumps(actuator.device_state),
-                metadata=json.dumps(actuator.device_metadata),
-                timestamp=actuator.timestamp.isoformat(),
-                is_online=is_online,
-            ))
-        logger.debug(
-            'Novo relatório gerado: %d atuadores reportados',
-            len(actuators),
-        )
-        report = ActuatorsReport(devices=summary).SerializeToString()
-        with args.db_actuators_report_lock:
-            args.actuators_report = report
 
 
 def build_command_message(type, body):
@@ -90,7 +49,6 @@ def send_actuator_command(args, actuator_id, actuator_category, command_type, co
         device_metadata=metadata,
         timestamp=timestamp,
     )
-    args.pending_actuators_updates.set()
     return reply
 
 
@@ -144,7 +102,6 @@ def actuator_handler(args, sock, address):
         device_metadata=metadata,
         timestamp=timestamp,
     )
-    args.pending_actuators_updates.set()
 
 
 def actuators_listener(args):
