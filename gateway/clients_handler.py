@@ -97,6 +97,7 @@ def process_set_actuator_state(args, device_name, state_string):
             status=ReplyStatus.RS_INVALID_STATE,
             reply_to=RequestType.RT_SET_ACTUATOR_STATE,
         )
+    comply_msg.update.is_online = True
     return ClientReply(
         status=ReplyStatus.RS_OK,
         reply_to=RequestType.RT_SET_ACTUATOR_STATE,
