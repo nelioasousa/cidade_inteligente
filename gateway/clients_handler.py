@@ -45,7 +45,7 @@ def build_sensor_data(args, device_name):
     )
     return SensorData(
         device_name=device_name,
-        metadata=json.dumps(sensor.current_metadata),
+        metadata=json.dumps(sensor.device_metadata),
         readings=readings,
         is_online=is_online,
     )
@@ -65,8 +65,8 @@ def build_actuator_update(args, device_name):
     )
     return ActuatorUpdate(
         device_name=device_name,
-        state=json.dumps(actuator.current_state),
-        metadata=json.dumps(actuator.current_metadata),
+        state=json.dumps(actuator.device_state),
+        metadata=json.dumps(actuator.device_metadata),
         timestamp=actuator.timestamp.isoformat(),
         is_online=is_online,
     )

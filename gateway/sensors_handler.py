@@ -31,7 +31,7 @@ def sensors_report_generator(args):
                 device_name=f'{sensor.type}-{sensor.id}',
                 reading_value=last_reading.value,
                 timestamp=last_reading.timestamp.isoformat(),
-                metadata=json.dumps(sensor.current_metadata),
+                metadata=json.dumps(sensor.device_metadata),
                 is_online=is_online,
             ))
         logger.debug(
@@ -87,5 +87,5 @@ def sensors_listener(args):
             )
             timestamp = datetime.datetime.fromisoformat(reading.timestamp)
             sensors_repository.register_sensor_reading(
-                sensor.ip_address, reading.reading_value, timestamp
+                sensor.ip_address, reading.reading_value, timestamp,
             )

@@ -48,7 +48,7 @@ def registration_handler(args, sock, address):
                 sensors_repository.add_sensor(
                     sensor_type='Any',
                     ip_address=device_addrs.ip,
-                    metadata=metadata,
+                    device_metadata=metadata,
                 )
             case DeviceType.DT_ACTUATOR:
                 actuators_repository = get_actuator_repository()
@@ -60,8 +60,8 @@ def registration_handler(args, sock, address):
                     actuator_type='Any',
                     ip_address=device_addrs.ip,
                     communication_port=device_addrs.port,
-                    current_state=state,
-                    metadata=metadata,
+                    device_state=state,
+                    device_metadata=metadata,
                     timestamp=timestamp,
                 )
             case _:

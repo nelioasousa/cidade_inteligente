@@ -36,8 +36,8 @@ def actuators_report_generator(args):
             )
             summary.append(ActuatorUpdate(
                 device_name=f'{actuator.type}-{actuator.id}',
-                state=json.dumps(actuator.current_state),
-                metadata=json.dumps(actuator.current_metadata),
+                state=json.dumps(actuator.device_state),
+                metadata=json.dumps(actuator.device_metadata),
                 timestamp=actuator.timestamp.isoformat(),
                 is_online=is_online,
             ))
@@ -86,8 +86,8 @@ def send_actuator_command(args, actuator_name, command_type, command_body):
     timestamp = datetime.datetime.fromisoformat(reply.update.timestamp)
     actuators_repository.register_actuator_update(
         actuator_id=actuator_id,
-        current_state=state,
-        metadata=metadata,
+        device_state=state,
+        device_metadata=metadata,
         timestamp=timestamp,
     )
     args.pending_actuators_updates.set()
@@ -130,8 +130,8 @@ def actuator_handler(args, sock, address):
     actuators_repository = get_actuator_repository()
     actuators_repository.register_actuator_update(
         actuator_id=actuator_id,
-        current_state=state,
-        metadata=metadata,
+        device_state=state,
+        device_metadata=metadata,
         timestamp=timestamp,
     )
     args.pending_actuators_updates.set()

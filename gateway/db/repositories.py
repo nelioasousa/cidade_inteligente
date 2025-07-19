@@ -22,7 +22,7 @@ class SensorRepository:
         self,
         sensor_type: str,
         ip_address: str,
-        metadata: dict[str, Any]
+        device_metadata: dict[str, Any]
     ):
         sensor = self.get_sensor_by_ip_address(ip_address)
         if sensor is None:
@@ -30,14 +30,14 @@ class SensorRepository:
                 sensor = Sensor(
                     type=sensor_type,
                     ip_address=ip_address,
-                    current_metadata=metadata,
+                    device_metadata=device_metadata,
                 )
                 session.add(sensor)
         else:
             with self.session_maker.begin() as session:
                 sensor = session.merge(sensor)
                 sensor.type = sensor_type
-                sensor.current_metadata = metadata
+                sensor.device_metadata = device_metadata
         return sensor
 
     def get_sensor_by_id(self, sensor_id: int):
@@ -103,8 +103,8 @@ class ActuatorRepository:
         actuator_type: str,
         ip_address: str,
         communication_port: int,
-        current_state: dict[str, Any],
-        metadata: dict[str, Any],
+        device_state: dict[str, Any],
+        device_metadata: dict[str, Any],
         timestamp: datetime.datetime,
     ):
         actuator = self.get_actuator_by_ip_address(ip_address)
@@ -114,8 +114,8 @@ class ActuatorRepository:
                     type=actuator_type,
                     ip_address=ip_address,
                     communication_port=communication_port,
-                    current_state=current_state,
-                    current_metadata=metadata,
+                    device_state=device_state,
+                    device_metadata=device_metadata,
                     timestamp=timestamp,
                 )
                 session.add(actuator)
@@ -124,8 +124,8 @@ class ActuatorRepository:
                 actuator = session.merge(actuator)
                 actuator.type = actuator_type
                 actuator.communication_port = communication_port
-                actuator.current_state = current_state
-                actuator.current_metadata = metadata
+                actuator.device_state = device_state
+                actuator.device_metadata = device_metadata
                 actuator.timestamp = timestamp
         return actuator
 
@@ -160,15 +160,15 @@ class ActuatorRepository:
     def register_actuator_update(
         self,
         actuator_id: int,
-        current_state: dict[str, Any],
-        metadata: dict[str, Any],
+        device_state: dict[str, Any],
+        device_metadata: dict[str, Any],
         timestamp: datetime.datetime,
     ):
         with self.session_maker.begin() as session:
             actuator = session.get(Actuator, actuator_id)
             if actuator is None:
                 return False
-            actuator.current_state = current_state
-            actuator.current_metadata = metadata
+            actuator.device_state = device_state
+            actuator.device_metadata = device_metadata
             actuator.timestamp = timestamp
             return True

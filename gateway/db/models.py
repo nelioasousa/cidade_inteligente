@@ -23,7 +23,7 @@ class Sensor(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     type: Mapped[str] = mapped_column(String, nullable=False)
     ip_address: Mapped[str] = mapped_column(String, nullable=False)
-    current_metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
+    device_metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
 
     last_seen_date: Mapped[datetime.date] = mapped_column(
         Date, nullable=False, default=last_seen_date_factory,
@@ -69,8 +69,8 @@ class Actuator(Base):
     type: Mapped[str] = mapped_column(String, nullable=False)
     ip_address: Mapped[str] = mapped_column(String, nullable=False)
     communication_port: Mapped[int] = mapped_column(Integer, nullable=False)
-    current_state: Mapped[dict] = mapped_column(JSON, nullable=False)
-    current_metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
+    device_state: Mapped[dict] = mapped_column(JSON, nullable=False)
+    device_metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
     timestamp: Mapped[datetime.datetime] = mapped_column(UTCDateTime, nullable=False)
 
     last_seen_date: Mapped[datetime.date] = mapped_column(
