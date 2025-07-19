@@ -26,7 +26,8 @@ def get_actuators_report(args):
 def build_sensor_data(args, device_name):
     sensors_repository = get_sensors_repository()
     sensor_category, sensor_id = device_name.split('-')
-    sensor = sensors_repository.get_sensor(int(sensor_id), sensor_category)
+    sensor_id = int(sensor_id)
+    sensor = sensors_repository.get_sensor(sensor_id, sensor_category)
     if sensor is None:
         return None
     readings = sensors_repository.get_sensor_readings(sensor.id, sensor.category)
@@ -40,7 +41,7 @@ def build_sensor_data(args, device_name):
     ls_date = sensor.last_seen_date
     ls_clock = sensor.last_seen_clock
     is_online = (
-        ls_date == datetime.date.today()
+        ls_date == datetime.datetime.now(datetime.UTC).date()
         and (time.monotonic() - ls_clock) <= args.sensors_tolerance
     )
     return SensorData(
@@ -54,11 +55,12 @@ def build_sensor_data(args, device_name):
 def build_actuator_update(args, device_name):
     actuators_repository = get_actuators_repository()
     actuator_category, actuator_id = device_name.split('-')
-    actuator = actuators_repository.get_actuator(int(actuator_id), actuator_category)
+    actuator_id = int(actuator_id)
+    actuator = actuators_repository.get_actuator(actuator_id, actuator_category)
     if actuator is None:
         return None
     is_online = (
-        actuator.last_seen_date == datetime.date.today()
+        actuator.last_seen_date == datetime.datetime.now(datetime.UTC).date()
         and (time.monotonic() - actuator.last_seen_clock) <= args.actuators_tolerance
     )
     return ActuatorUpdate(

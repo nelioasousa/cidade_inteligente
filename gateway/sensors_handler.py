@@ -71,8 +71,9 @@ def sensors_listener(args):
                 continue
             reading = SensorReading()
             reading.ParseFromString(msg)
-            category, sensor_id = reading.device_name.split('-')
-            sensor = sensors_repository.get_sensor(int(sensor_id), category)
+            sensor_category, sensor_id = reading.device_name.split('-')
+            sensor_id = int(sensor_id)
+            sensor = sensors_repository.get_sensor(sensor_id, sensor_category)
             if sensor is None:
                 logger.warning(
                     'Recebendo leituras de um sensor '

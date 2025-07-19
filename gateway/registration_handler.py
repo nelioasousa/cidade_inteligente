@@ -41,13 +41,14 @@ def registration_handler(args, sock, address):
         device_info = request.device_info
         device_addrs = request.device_address
         device_category, device_id = device_info.name.split('-')
+        device_id = int(device_id)
         match request.device_info.type:
             case DeviceType.DT_SENSOR:
                 sensors_repository = get_sensors_repository()
                 report_port = args.sensors_port
                 metadata = json.loads(device_info.metadata)
                 sensors_repository.add_sensor(
-                    sensor_id=int(device_id),
+                    sensor_id=device_id,
                     sensor_category=device_category,
                     ip_address=device_addrs.ip,
                     device_metadata=metadata,

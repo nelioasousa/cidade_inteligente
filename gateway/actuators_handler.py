@@ -134,7 +134,6 @@ def actuator_handler(args, sock, address):
         update.timestamp,
         update.device_name,
     )
-    actuator_category, actuator_id = update.device_name.split('-')
     state = json.loads(update.state)
     metadata = json.loads(update.metadata)
     timestamp = datetime.datetime.fromisoformat(update.timestamp)
