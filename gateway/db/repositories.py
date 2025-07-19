@@ -20,15 +20,17 @@ class SensorRepository:
 
     def add_sensor(
         self,
-        sensor_type: str,
+        sensor_id: int,
+        sensor_category: str,
         ip_address: str,
-        device_metadata: dict[str, Any]
+        device_metadata: dict[str, Any],
     ):
-        sensor = self.get_sensor_by_ip_address(ip_address)
+        sensor = self.get_sensor(sensor_id, sensor_category)
         if sensor is None:
             with self.session_maker.begin() as session:
                 sensor = Sensor(
-                    type=sensor_type,
+                    id=sensor_id,
+                    category=sensor_category,
                     ip_address=ip_address,
                     device_metadata=device_metadata,
                 )
@@ -36,40 +38,37 @@ class SensorRepository:
         else:
             with self.session_maker.begin() as session:
                 sensor = session.merge(sensor)
-                sensor.type = sensor_type
+                sensor.ip_address = ip_address
                 sensor.device_metadata = device_metadata
+                sensor.mark_as_seen()
         return sensor
 
-    def get_sensor_by_id(self, sensor_id: int):
-        stmt = select(Sensor).where(Sensor.id == sensor_id).limit(1)
+    def get_sensor(self, sensor_id: int, sensor_category: str):
         with self.session_maker() as session:
-            return session.scalars(stmt).first()
+            return session.get(Sensor, (sensor_id, sensor_category))
 
-    def get_sensor_by_ip_address(self, ip_address: str):
-        stmt = select(Sensor).where(Sensor.ip_address == ip_address).limit(1)
+    def get_sensor_readings(self, sensor_id: int, sensor_category: str):
         with self.session_maker() as session:
-            return session.scalars(stmt).first()
-
-    def get_sensor_readings(self, sensor_id: int):
-        with self.session_maker() as session:
-            sensor = session.get(Sensor, sensor_id)
+            sensor = session.get(Sensor, (sensor_id, sensor_category))
             if sensor is None:
                 return None
-            return sensor.readings
+            readings = sensor.readings
+        readings.sort(key=(lambda x: x.timestamp))
+        return readings
 
     def get_all_sensors(self):
         stmt = select(Sensor)
         with self.session_maker() as session:
             return session.scalars(stmt).all()
 
-    def get_sensors_by_type(self, sensor_type: str):
-        stmt = select(Sensor).where(Sensor.type == sensor_type)
+    def get_sensors_by_category(self, sensor_category: str):
+        stmt = select(Sensor).where(Sensor.category == sensor_category)
         with self.session_maker() as session:
             return session.scalars(stmt).all()
 
-    def mark_sensor_as_seen(self, sensor_id: int):
+    def mark_sensor_as_seen(self, sensor_id: int, sensor_category: str):
         with self.session_maker.begin() as session:
-            sensor = session.get(Sensor, sensor_id)
+            sensor = session.get(Sensor, (sensor_id, sensor_category))
             if sensor is None:
                 return False
             sensor.mark_as_seen()
@@ -77,11 +76,12 @@ class SensorRepository:
 
     def register_sensor_reading(
         self,
-        sensor_ip_address: str,
+        sensor_id: int,
+        sensor_category: str,
         reading_value: float,
         reading_timestamp: datetime.datetime,
     ):
-        sensor = self.get_sensor_by_ip_address(sensor_ip_address)
+        sensor = self.get_sensor(sensor_id, sensor_category)
         if sensor is None:
             return False
         with self.session_maker.begin() as session:
@@ -89,7 +89,8 @@ class SensorRepository:
             reading = Reading(
                 value=reading_value,
                 timestamp=reading_timestamp,
-                sensor_id=sensor.id,
+                sensor_id=sensor_id,
+                sensor_category=sensor_category,
             )
             session.add(reading)
             sensor.mark_as_seen()
@@ -102,18 +103,20 @@ class ActuatorRepository:
 
     def add_actuator(
         self,
-        actuator_type: str,
+        actuator_id: int,
+        actuator_category: str,
         ip_address: str,
         communication_port: int,
         device_state: dict[str, Any],
         device_metadata: dict[str, Any],
         timestamp: datetime.datetime,
     ):
-        actuator = self.get_actuator_by_ip_address(ip_address)
+        actuator = self.get_actuator(actuator_id, actuator_category)
         if actuator is None:
             with self.session_maker.begin() as session:
                 actuator = Actuator(
-                    type=actuator_type,
+                    id=actuator_id,
+                    category=actuator_category,
                     ip_address=ip_address,
                     communication_port=communication_port,
                     device_state=device_state,
@@ -124,36 +127,38 @@ class ActuatorRepository:
         else:
             with self.session_maker.begin() as session:
                 actuator = session.merge(actuator)
-                actuator.type = actuator_type
+                actuator.ip_address = ip_address
                 actuator.communication_port = communication_port
                 actuator.device_state = device_state
                 actuator.device_metadata = device_metadata
                 actuator.timestamp = timestamp
         return actuator
 
-    def get_actuator_by_id(self, actuator_id: int):
-        stmt = select(Actuator).where(Actuator.id == actuator_id).limit(1)
+    def get_actuator(self, actuator_id: int, actuator_category: str):
         with self.session_maker() as session:
-            return session.scalars(stmt).first()
+            return session.get(Actuator, (actuator_id, actuator_category))
 
-    def get_actuator_by_ip_address(self, ip_address: str):
-        stmt = select(Actuator).where(Actuator.ip_address == ip_address).limit(1)
-        with self.session_maker() as session:
-            return session.scalars(stmt).first()
+    # def get_actuator_by_address(self, ip_address: str, communication_port: int):
+    #     stmt = select(Actuator).where(
+    #         Actuator.ip_address == ip_address,
+    #         Actuator.communication_port == communication_port,
+    #     ).limit(1)
+    #     with self.session_maker() as session:
+    #         return session.scalars(stmt).first()
 
     def get_all_actuators(self):
         stmt = select(Actuator)
         with self.session_maker() as session:
             return session.scalars(stmt).all()
 
-    def get_actuators_by_type(self, actuator_type: str):
-        stmt = select(Actuator).where(Actuator.type == actuator_type)
+    def get_actuators_by_category(self, actuator_category: str):
+        stmt = select(Actuator).where(Actuator.category == actuator_category)
         with self.session_maker() as session:
             return session.scalars(stmt).all()
 
-    def mark_actuator_as_seen(self, actuator_id: int):
+    def mark_actuator_as_seen(self, actuator_id: int, actuator_category: str):
         with self.session_maker.begin() as session:
-            actuator = session.get(Actuator, actuator_id)
+            actuator = session.get(Actuator, (actuator_id, actuator_category))
             if actuator is None:
                 return False
             actuator.mark_as_seen()
@@ -162,12 +167,13 @@ class ActuatorRepository:
     def register_actuator_update(
         self,
         actuator_id: int,
+        actuator_category: str,
         device_state: dict[str, Any],
         device_metadata: dict[str, Any],
         timestamp: datetime.datetime,
     ):
         with self.session_maker.begin() as session:
-            actuator = session.get(Actuator, actuator_id)
+            actuator = session.get(Actuator, (actuator_id, actuator_category))
             if actuator is None:
                 return False
             if timestamp > actuator.timestamp:

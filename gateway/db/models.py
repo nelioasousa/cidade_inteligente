@@ -1,6 +1,6 @@
 import time
 import datetime
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKeyConstraint
 from sqlalchemy import Integer, Float, String
 from sqlalchemy import Date, DateTime
 from sqlalchemy import JSON
@@ -13,7 +13,7 @@ class Base(DeclarativeBase):
     pass
 
 
-def last_seen_date_factory():
+def get_utc_date():
     return datetime.datetime.now(datetime.UTC).date()
 
 
@@ -21,12 +21,12 @@ class Sensor(Base):
     __tablename__ = 'sensors'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    type: Mapped[str] = mapped_column(String, nullable=False)
+    category: Mapped[str] = mapped_column(String, primary_key=True)
     ip_address: Mapped[str] = mapped_column(String, nullable=False)
     device_metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
 
     last_seen_date: Mapped[datetime.date] = mapped_column(
-        Date, nullable=False, default=last_seen_date_factory,
+        Date, nullable=False, default=get_utc_date,
     )
     last_seen_clock: Mapped[float] = mapped_column(
         Float, nullable=False, default=time.monotonic,
@@ -35,7 +35,7 @@ class Sensor(Base):
     readings: Mapped[list['Reading']] = relationship(back_populates='sensor')
 
     def mark_as_seen(self):
-        self.last_seen_date = last_seen_date_factory()
+        self.last_seen_date = get_utc_date()
         self.last_seen_clock = time.monotonic()
         return
 
@@ -58,7 +58,16 @@ class Reading(Base):
     value: Mapped[float] = mapped_column(Float, nullable=False)
     timestamp: Mapped[datetime.datetime] = mapped_column(UTCDateTime, nullable=False)
 
-    sensor_id: Mapped[int] = mapped_column(ForeignKey('sensors.id'), nullable=False)
+    sensor_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    sensor_category: Mapped[str] = mapped_column(String, nullable=False)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            columns=['sensor_id', 'sensor_category'],
+            refcolumns=['sensors.id', 'sensors.category']
+        ),
+    )
+
     sensor: Mapped['Sensor'] = relationship(back_populates='readings')
 
 
@@ -66,7 +75,7 @@ class Actuator(Base):
     __tablename__ = 'actuators'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    type: Mapped[str] = mapped_column(String, nullable=False)
+    category: Mapped[str] = mapped_column(String, primary_key=True)
     ip_address: Mapped[str] = mapped_column(String, nullable=False)
     communication_port: Mapped[int] = mapped_column(Integer, nullable=False)
     device_state: Mapped[dict] = mapped_column(JSON, nullable=False)
@@ -74,13 +83,13 @@ class Actuator(Base):
     timestamp: Mapped[datetime.datetime] = mapped_column(UTCDateTime, nullable=False)
 
     last_seen_date: Mapped[datetime.date] = mapped_column(
-        Date, nullable=False, default=last_seen_date_factory,
+        Date, nullable=False, default=get_utc_date,
     )
     last_seen_clock: Mapped[float] = mapped_column(
         Float, nullable=False, default=time.monotonic,
     )
 
     def mark_as_seen(self):
-        self.last_seen_date = last_seen_date_factory()
+        self.last_seen_date = get_utc_date()
         self.last_seen_clock = time.monotonic()
         return

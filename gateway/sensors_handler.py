@@ -18,7 +18,7 @@ def sensors_report_generator(args):
         tolerance = args.sensors_tolerance
         summary = []
         for sensor in sensors:
-            readings = sensors_repository.get_sensor_readings(sensor.id)
+            readings = sensors_repository.get_sensor_readings(sensor.id, sensor.category)
             try:
                 last_reading = readings[-1]
             except IndexError:
@@ -28,7 +28,7 @@ def sensors_report_generator(args):
                 and (now_clock - sensor.last_seen_clock) <= tolerance
             )
             summary.append(SensorReading(
-                device_name=f'{sensor.type}-{sensor.id}',
+                device_name=f'{sensor.category}-{sensor.id}',
                 reading_value=last_reading.value,
                 timestamp=last_reading.timestamp.isoformat(),
                 metadata=json.dumps(sensor.device_metadata),
@@ -69,7 +69,10 @@ def sensors_listener(args):
                 msg, addrs = sock.recvfrom(1024)
             except TimeoutError:
                 continue
-            sensor = sensors_repository.get_sensor_by_ip_address(addrs[0])
+            reading = SensorReading()
+            reading.ParseFromString(msg)
+            category, sensor_id = reading.device_name.split('-')
+            sensor = sensors_repository.get_sensor(int(sensor_id), category)
             if sensor is None:
                 logger.warning(
                     'Recebendo leituras de um sensor '
@@ -77,8 +80,6 @@ def sensors_listener(args):
                     addrs[0],
                 )
                 continue
-            reading = SensorReading()
-            reading.ParseFromString(msg)
             logger.debug(
                 'Leitura de sensor recebida: (%s, %s, %.6f)',
                 reading.timestamp,
@@ -87,5 +88,5 @@ def sensors_listener(args):
             )
             timestamp = datetime.datetime.fromisoformat(reading.timestamp)
             sensors_repository.register_sensor_reading(
-                sensor.ip_address, reading.reading_value, timestamp,
+                sensor.id, sensor.category, reading.reading_value, timestamp,
             )

@@ -40,13 +40,15 @@ def registration_handler(args, sock, address):
         request.ParseFromString(msg)
         device_info = request.device_info
         device_addrs = request.device_address
+        device_category, device_id = device_info.name.split('-')
         match request.device_info.type:
             case DeviceType.DT_SENSOR:
                 sensors_repository = get_sensors_repository()
                 report_port = args.sensors_port
                 metadata = json.loads(device_info.metadata)
                 sensors_repository.add_sensor(
-                    sensor_type='Any',
+                    sensor_id=int(device_id),
+                    sensor_category=device_category,
                     ip_address=device_addrs.ip,
                     device_metadata=metadata,
                 )
@@ -57,7 +59,8 @@ def registration_handler(args, sock, address):
                 metadata = json.loads(device_info.metadata)
                 timestamp = datetime.fromisoformat(device_info.timestamp)
                 actuators_repository.add_actuator(
-                    actuator_type='Any',
+                    actuator_id=device_id,
+                    actuator_category=device_category,
                     ip_address=device_addrs.ip,
                     communication_port=device_addrs.port,
                     device_state=state,

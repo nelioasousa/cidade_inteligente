@@ -35,7 +35,7 @@ def actuators_report_generator(args):
                 and (now_clock - actuator.last_seen_clock) <= tolerance
             )
             summary.append(ActuatorUpdate(
-                device_name=f'{actuator.type}-{actuator.id}',
+                device_name=f'{actuator.category}-{actuator.id}',
                 state=json.dumps(actuator.device_state),
                 metadata=json.dumps(actuator.device_metadata),
                 timestamp=actuator.timestamp.isoformat(),
@@ -61,13 +61,12 @@ def build_command_message(type, body):
     return msg.SerializeToString()
 
 
-def send_actuator_command(args, actuator_name, command_type, command_body):
+def send_actuator_command(args, actuator_id, actuator_category, command_type, command_body):
     actuators_repository = get_actuators_repository()
     command = build_command_message(command_type, command_body)
     if command is None:
         return None
-    actuator_id = int(actuator_name.split('-')[-1])
-    actuator = actuators_repository.get_actuator_by_id(actuator_id)
+    actuator = actuators_repository.get_actuator(actuator_id, actuator_category)
     if actuator is None:
         return None
     address = (actuator.ip_address, actuator.communication_port)
@@ -86,6 +85,7 @@ def send_actuator_command(args, actuator_name, command_type, command_body):
     timestamp = datetime.datetime.fromisoformat(reply.update.timestamp)
     actuators_repository.register_actuator_update(
         actuator_id=actuator_id,
+        actuator_category=actuator_category,
         device_state=state,
         device_metadata=metadata,
         timestamp=timestamp,
@@ -117,19 +117,30 @@ def actuator_handler(args, sock, address):
             )
         finally:
             sock.close()
+    actuator_category, actuator_id = update.device_name.split('-')
+    actuator_id = int(actuator_id)
+    actuators_repository = get_actuators_repository()
+    actuator = actuators_repository.get_actuator(actuator_id, actuator_category)
+    if actuator is None:
+        logger.warning(
+            'Recebendo atualizações de um atuador '
+            'não registrado localizado em %s',
+            address[0],
+        )
+        return
     logger.debug(
         'Atuador %s enviou uma atualização: (%s, %s)',
         update.device_name,
         update.timestamp,
         update.device_name,
     )
-    actuator_id = int(update.device_name.split('-')[-1])
+    actuator_category, actuator_id = update.device_name.split('-')
     state = json.loads(update.state)
     metadata = json.loads(update.metadata)
     timestamp = datetime.datetime.fromisoformat(update.timestamp)
-    actuators_repository = get_actuators_repository()
     actuators_repository.register_actuator_update(
         actuator_id=actuator_id,
+        actuator_category=actuator_category,
         device_state=state,
         device_metadata=metadata,
         timestamp=timestamp,
@@ -138,7 +149,6 @@ def actuator_handler(args, sock, address):
 
 
 def actuators_listener(args):
-    actuators_repository = get_actuators_repository()
     logger = logging.getLogger('ACTUATORS_LISTENER')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -161,14 +171,6 @@ def actuators_listener(args):
                         'Erro ao tentar conexão com um atuador: (%s) %s',
                         type(e).__name__,
                         e,
-                    )
-                    continue
-                actuator = actuators_repository.get_actuator_by_ip_address(addrs[0])
-                if actuator is None:
-                    logger.warning(
-                        'Recebendo atualizações de um atuador '
-                        'não registrado localizado em %s',
-                        addrs[0],
                     )
                     continue
                 try:

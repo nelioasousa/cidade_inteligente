@@ -25,22 +25,22 @@ def get_actuators_report(args):
 
 def build_sensor_data(args, device_name):
     sensors_repository = get_sensors_repository()
-    sensor_id = int(device_name.split('-')[-1])
-    sensor = sensors_repository.get_sensor_by_id(sensor_id)
+    sensor_category, sensor_id = device_name.split('-')
+    sensor = sensors_repository.get_sensor(int(sensor_id), sensor_category)
     if sensor is None:
         return None
-    readings = sensors_repository.get_sensor_readings(sensor.id)
-    readings.sort(key=(lambda x: x.timestamp))
+    readings = sensors_repository.get_sensor_readings(sensor.id, sensor.category)
     readings = [
         SensorData.SimpleReading(
-            timestamp=reading.timestamp.isoformat(), reading_value=reading.value,
+            timestamp=reading.timestamp.isoformat(),
+            reading_value=reading.value,
         )
         for reading in readings
     ]
-    ls_day = sensor.last_seen_date
+    ls_date = sensor.last_seen_date
     ls_clock = sensor.last_seen_clock
     is_online = (
-        ls_day == datetime.date.today()
+        ls_date == datetime.date.today()
         and (time.monotonic() - ls_clock) <= args.sensors_tolerance
     )
     return SensorData(
@@ -53,15 +53,13 @@ def build_sensor_data(args, device_name):
 
 def build_actuator_update(args, device_name):
     actuators_repository = get_actuators_repository()
-    actuator_id = int(device_name.split('-')[-1])
-    actuator = actuators_repository.get_actuator_by_id(actuator_id)
+    actuator_category, actuator_id = device_name.split('-')
+    actuator = actuators_repository.get_actuator(int(actuator_id), actuator_category)
     if actuator is None:
         return None
-    now_clock = time.monotonic()
-    tolerance = args.actuators_tolerance
     is_online = (
         actuator.last_seen_date == datetime.date.today()
-        and (now_clock - actuator.last_seen_clock) <= tolerance
+        and (time.monotonic() - actuator.last_seen_clock) <= args.actuators_tolerance
     )
     return ActuatorUpdate(
         device_name=device_name,
@@ -74,15 +72,18 @@ def build_actuator_update(args, device_name):
 
 def process_set_actuator_state(args, device_name, state_string):
     actuators_repository = get_actuators_repository()
-    actuator_id = int(device_name.split('-')[-1])
-    if actuators_repository.get_actuator_by_id(actuator_id) is None:
+    actuator_category, actuator_id = device_name.split('-')
+    actuator_id = int(actuator_id)
+    actuator = actuators_repository.get_actuator(actuator_id, actuator_category)
+    if actuator is None:
         return ClientReply(
             status=ReplyStatus.RS_UNKNOWN_DEVICE,
             reply_to=RequestType.RT_SET_ACTUATOR_STATE,
         )
     comply_msg = send_actuator_command(
         args=args,
-        actuator_name=device_name,
+        actuator_id=actuator_id,
+        actuator_category=actuator_category,
         command_type=CommandType.CT_SET_STATE,
         command_body=state_string,
     )
@@ -105,15 +106,18 @@ def process_set_actuator_state(args, device_name, state_string):
 
 def process_run_actuator_action(args, device_name, action_name):
     actuators_repository = get_actuators_repository()
-    actuator_id = int(device_name.split('-')[-1])
-    if actuators_repository.get_actuator_by_id(actuator_id) is None:
+    actuator_category, actuator_id = device_name.split('-')
+    actuator_id = int(actuator_id)
+    actuator = actuators_repository.get_actuator(actuator_id, actuator_category)
+    if actuator is None:
         return ClientReply(
             status=ReplyStatus.RS_UNKNOWN_DEVICE,
             reply_to=RequestType.RT_RUN_ACTUATOR_ACTION,
         )
     comply_msg = send_actuator_command(
         args=args,
-        actuator_name=device_name,
+        actuator_id=actuator_id,
+        actuator_category=actuator_category,
         command_type=CommandType.CT_ACTION,
         command_body=action_name,
     )
