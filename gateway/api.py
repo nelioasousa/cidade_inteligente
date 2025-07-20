@@ -1,8 +1,12 @@
 import time
+import json
 import datetime
-from flask import Flask
-from flask_restful import Api, Resource
+from types import SimpleNamespace
+from flask import Flask, request
+from flask_restful import Api, Resource, abort
+from actuators_handler import send_actuator_command
 from db.repositories import get_sensors_repository, get_actuators_repository
+from messages_pb2 import CommandType, ComplyStatus
 
 
 app = Flask(__name__)
@@ -13,7 +17,12 @@ sensors_repository = get_sensors_repository()
 actuators_repository = get_actuators_repository()
 
 
+SENSORS_TOLERANCE = 6.0
+ACTUATORS_TOLERANCE = 6.0
+
+
 class Sensors(Resource):
+
     def get(self):
         sensors = sensors_repository.get_all_sensors()
         today = datetime.datetime.now(datetime.UTC).date()
@@ -22,9 +31,12 @@ class Sensors(Resource):
         for sensor in sensors:
             is_online = (
                 sensor.last_seen_date == today
-                and (now_clock - sensor.last_seen_clock) <= 6.0
+                and (now_clock - sensor.last_seen_clock) <= SENSORS_TOLERANCE
             )
-            last_reading = sensors_repository.get_sensor_last_reading(sensor.id, sensor.category)
+            last_reading = sensors_repository.get_sensor_last_reading(
+                sensor.id,
+                sensor.category,
+            )
             response.append({
                 'deviceId': sensor.id,
                 'deviceCategory': sensor.category,
@@ -38,4 +50,172 @@ class Sensors(Resource):
         return response
 
 
+class SensorsByCategory(Resource):
+
+    def get(self, sensors_category: str):
+        sensors = sensors_repository.get_sensors_by_category(sensors_category)
+        today = datetime.datetime.now(datetime.UTC).date()
+        now_clock = time.monotonic()
+        response = []
+        for sensor in sensors:
+            is_online = (
+                sensor.last_seen_date == today
+                and (now_clock - sensor.last_seen_clock) <= SENSORS_TOLERANCE
+            )
+            last_reading = sensors_repository.get_sensor_last_reading(
+                sensor.id,
+                sensor.category,
+            )
+            response.append({
+                'deviceId': sensor.id,
+                'deviceCategory': sensor.category,
+                'isOnline': is_online,
+                'lastReading': dict() if last_reading is None else {
+                    'timestamp': last_reading.timestamp.isoformat(),
+                    'value': last_reading.value,
+                },
+                'metadata': sensor.device_metadata,
+            })
+        return response
+
+
+class Sensor(Resource):
+
+    def get(self, sensor_category: str, sensor_id: int):
+        sensor_category = sensor_category.lower()
+        sensor = sensors_repository.get_sensor(sensor_id, sensor_category)
+        if sensor is None:
+            abort(404, message=f'Sensor {sensor_category}-{sensor_id} not found')
+        today = datetime.datetime.now(datetime.UTC).date()
+        now_clock = time.monotonic()
+        is_online = (
+            sensor.last_seen_date == today
+            and (now_clock - sensor.last_seen_clock) <= SENSORS_TOLERANCE
+        )
+        last_reading = sensors_repository.get_sensor_last_reading(
+            sensor.id,
+            sensor.category,
+        )
+        return {
+            'deviceId': sensor.id,
+            'deviceCategory': sensor.category,
+            'isOnline': is_online,
+            'lastReading': dict() if last_reading is None else {
+                'timestamp': last_reading.timestamp.isoformat(),
+                'value': last_reading.value,
+            },
+            'metadata': sensor.device_metadata,
+        }
+
+
+class Actuators(Resource):
+
+    def get(self):
+        today = datetime.datetime.now(datetime.UTC).date()
+        now_clock = time.monotonic()
+        response = [
+            {
+                'deviceId': actuator.id,
+                'deviceCategory': actuator.category,
+                'isOnline': (
+                    actuator.last_seen_date == today
+                    and (now_clock - actuator.last_seen_clock) <= ACTUATORS_TOLERANCE
+                ),
+                'lastUpdate': actuator.timestamp.isoformat(),
+                'currentState': actuator.device_state,
+                'metadata': actuator.device_metadata,
+            }
+            for actuator in actuators_repository.get_all_actuators()
+        ]
+        return response
+
+
+class ActuatorsByCategory(Resource):
+
+    def get(self, actuators_category: str):
+        today = datetime.datetime.now(datetime.UTC).date()
+        now_clock = time.monotonic()
+        response = [
+            {
+                'deviceId': actuator.id,
+                'deviceCategory': actuator.category,
+                'isOnline': (
+                    actuator.last_seen_date == today
+                    and (now_clock - actuator.last_seen_clock) <= ACTUATORS_TOLERANCE
+                ),
+                'lastUpdate': actuator.timestamp.isoformat(),
+                'currentState': actuator.device_state,
+                'metadata': actuator.device_metadata,
+            }
+            for actuator in actuators_repository.get_actuators_by_category(actuators_category)
+        ]
+        return response
+
+
+class Actuator(Resource):
+
+    def get(self, actuator_category: str, actuator_id: int):
+        actuator_category = actuator_category.lower()
+        actuator = actuators_repository.get_actuator(actuator_id, actuator_category)
+        if actuator is None:
+            abort(404, message=f'Actuator {actuator_category}-{actuator_id} not found')
+        today = datetime.datetime.now(datetime.UTC).date()
+        now_clock = time.monotonic()
+        return {
+            'deviceId': actuator.id,
+            'deviceCategory': actuator.category,
+            'isOnline': (
+                actuator.last_seen_date == today
+                and (now_clock - actuator.last_seen_clock) <= ACTUATORS_TOLERANCE
+            ),
+            'lastUpdate': actuator.timestamp.isoformat(),
+            'currentState': actuator.device_state,
+            'metadata': actuator.device_metadata,
+        }
+
+    def put(self, actuator_category: str, actuator_id: int):
+        data = request.get_json()
+        response = send_actuator_command(
+            args=SimpleNamespace(base_timeout=1.0),
+            actuator_id=actuator_id,
+            actuator_category=actuator_category,
+            command_type=CommandType.CT_SET_STATE,
+            command_body=json.dumps(data),
+        )
+        if response is None:
+            abort(404, message=f'Actuator {actuator_category}-{actuator_id} not found')
+        if response.status is ComplyStatus.CS_INVALID_STATE:
+            abort(400, message='Invalid state supplied')
+        if response.status is ComplyStatus.CS_FAIL:
+            abort(500, message='Something went wrong')
+        return {"message": "OK"}, 200
+
+    def post(self, actuator_category: str, actuator_id: int):
+        data = request.get_json()
+        if 'action' not in data:
+            abort(400, message='No "action" was specified')
+        response = send_actuator_command(
+            args=SimpleNamespace(base_timeout=1.0),
+            actuator_id=actuator_id,
+            actuator_category=actuator_category,
+            command_type=CommandType.CT_ACTION,
+            command_body=data['action'],
+        )
+        if response is None:
+            abort(404, message=f'Actuator {actuator_category}-{actuator_id} not found')
+        if response.status is ComplyStatus.CS_UNKNOWN_ACTION:
+            abort(400, message=f'Unknown action "{data['action']}"')
+        if response.status is ComplyStatus.CS_FAIL:
+            abort(500, message='Something went wrong')
+        return {"message": "OK"}, 200
+
+
+# Sensors
 api.add_resource(Sensors, '/sensors')
+api.add_resource(SensorsByCategory, '/sensors/<string:sensors_category>')
+api.add_resource(Sensor, '/sensors/<string:sensor_category>/<int:sensor_id>')
+
+# Actuators
+api.add_resource(Actuators, '/actuators')
+api.add_resource(ActuatorsByCategory, '/actuators/<string:actuators_category>')
+api.add_resource(Actuator, '/actuators/<string:actuator_category>/<int:actuator_id>')
