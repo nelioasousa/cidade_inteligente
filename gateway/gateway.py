@@ -105,7 +105,8 @@ def main():
 
     parser.add_argument(
         '-l', '--level', type=str, default='INFO',
-        help='Nível do logging. Valores permitidos são "DEBUG", "INFO", "WARN" e "ERROR".'
+        choices=['DEBUG', 'INFO', 'WARN', 'ERROR'],
+        help='Nível do logging.'
     )
 
     parser.add_argument(
@@ -114,10 +115,6 @@ def main():
     )
 
     args = parser.parse_args()
-
-    # Logging
-    lvl = args.level.strip().upper()
-    args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
 
     # Timeouts
     args.base_timeout = 1.0
