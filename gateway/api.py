@@ -1,6 +1,4 @@
-import time
 import json
-import datetime
 from types import SimpleNamespace
 from flask import Flask, request
 from flask_restful import Api, Resource, abort
@@ -17,22 +15,12 @@ sensors_repository = get_sensors_repository()
 actuators_repository = get_actuators_repository()
 
 
-SENSORS_TOLERANCE = 6.0
-ACTUATORS_TOLERANCE = 6.0
-
-
 class Sensors(Resource):
 
     def get(self):
         sensors = sensors_repository.get_all_sensors()
-        today = datetime.datetime.now(datetime.UTC).date()
-        now_clock = time.monotonic()
         response = []
         for sensor in sensors:
-            is_online = (
-                sensor.last_seen_date == today
-                and (now_clock - sensor.last_seen_clock) <= SENSORS_TOLERANCE
-            )
             last_reading = sensors_repository.get_sensor_last_reading(
                 sensor.id,
                 sensor.category,
@@ -40,7 +28,7 @@ class Sensors(Resource):
             response.append({
                 'deviceId': sensor.id,
                 'deviceCategory': sensor.category,
-                'isOnline': is_online,
+                'isOnline': sensor.is_online(),
                 'lastReading': dict() if last_reading is None else {
                     'timestamp': last_reading.timestamp.isoformat(),
                     'value': last_reading.value,
@@ -54,14 +42,8 @@ class SensorsByCategory(Resource):
 
     def get(self, sensors_category: str):
         sensors = sensors_repository.get_sensors_by_category(sensors_category)
-        today = datetime.datetime.now(datetime.UTC).date()
-        now_clock = time.monotonic()
         response = []
         for sensor in sensors:
-            is_online = (
-                sensor.last_seen_date == today
-                and (now_clock - sensor.last_seen_clock) <= SENSORS_TOLERANCE
-            )
             last_reading = sensors_repository.get_sensor_last_reading(
                 sensor.id,
                 sensor.category,
@@ -69,7 +51,7 @@ class SensorsByCategory(Resource):
             response.append({
                 'deviceId': sensor.id,
                 'deviceCategory': sensor.category,
-                'isOnline': is_online,
+                'isOnline': sensor.is_online(),
                 'lastReading': dict() if last_reading is None else {
                     'timestamp': last_reading.timestamp.isoformat(),
                     'value': last_reading.value,
@@ -86,12 +68,6 @@ class Sensor(Resource):
         sensor = sensors_repository.get_sensor(sensor_id, sensor_category)
         if sensor is None:
             abort(404, message=f'Sensor {sensor_category}-{sensor_id} not found')
-        today = datetime.datetime.now(datetime.UTC).date()
-        now_clock = time.monotonic()
-        is_online = (
-            sensor.last_seen_date == today
-            and (now_clock - sensor.last_seen_clock) <= SENSORS_TOLERANCE
-        )
         last_reading = sensors_repository.get_sensor_last_reading(
             sensor.id,
             sensor.category,
@@ -99,7 +75,7 @@ class Sensor(Resource):
         return {
             'deviceId': sensor.id,
             'deviceCategory': sensor.category,
-            'isOnline': is_online,
+            'isOnline': sensor.is_online(),
             'lastReading': dict() if last_reading is None else {
                 'timestamp': last_reading.timestamp.isoformat(),
                 'value': last_reading.value,
@@ -111,45 +87,33 @@ class Sensor(Resource):
 class Actuators(Resource):
 
     def get(self):
-        today = datetime.datetime.now(datetime.UTC).date()
-        now_clock = time.monotonic()
-        response = [
+        return [
             {
                 'deviceId': actuator.id,
                 'deviceCategory': actuator.category,
-                'isOnline': (
-                    actuator.last_seen_date == today
-                    and (now_clock - actuator.last_seen_clock) <= ACTUATORS_TOLERANCE
-                ),
+                'isOnline': actuator.is_online(),
                 'lastUpdate': actuator.timestamp.isoformat(),
                 'currentState': actuator.device_state,
                 'metadata': actuator.device_metadata,
             }
             for actuator in actuators_repository.get_all_actuators()
         ]
-        return response
 
 
 class ActuatorsByCategory(Resource):
 
     def get(self, actuators_category: str):
-        today = datetime.datetime.now(datetime.UTC).date()
-        now_clock = time.monotonic()
-        response = [
+        return [
             {
                 'deviceId': actuator.id,
                 'deviceCategory': actuator.category,
-                'isOnline': (
-                    actuator.last_seen_date == today
-                    and (now_clock - actuator.last_seen_clock) <= ACTUATORS_TOLERANCE
-                ),
+                'isOnline': actuator.is_online(),
                 'lastUpdate': actuator.timestamp.isoformat(),
                 'currentState': actuator.device_state,
                 'metadata': actuator.device_metadata,
             }
             for actuator in actuators_repository.get_actuators_by_category(actuators_category)
         ]
-        return response
 
 
 class Actuator(Resource):
@@ -159,15 +123,10 @@ class Actuator(Resource):
         actuator = actuators_repository.get_actuator(actuator_id, actuator_category)
         if actuator is None:
             abort(404, message=f'Actuator {actuator_category}-{actuator_id} not found')
-        today = datetime.datetime.now(datetime.UTC).date()
-        now_clock = time.monotonic()
         return {
             'deviceId': actuator.id,
             'deviceCategory': actuator.category,
-            'isOnline': (
-                actuator.last_seen_date == today
-                and (now_clock - actuator.last_seen_clock) <= ACTUATORS_TOLERANCE
-            ),
+            'isOnline': actuator.is_online(),
             'lastUpdate': actuator.timestamp.isoformat(),
             'currentState': actuator.device_state,
             'metadata': actuator.device_metadata,
