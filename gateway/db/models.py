@@ -13,7 +13,7 @@ class Base(DeclarativeBase):
     pass
 
 
-def get_utc_date():
+def utc_today():
     return datetime.datetime.now(datetime.UTC).date()
 
 
@@ -24,9 +24,9 @@ class Sensor(Base):
     category: Mapped[str] = mapped_column(String, primary_key=True)
     ip_address: Mapped[str] = mapped_column(String, nullable=False)
     device_metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
-
+    availability_tolerance: Mapped[float] = mapped_column(Float, nullable=False)
     last_seen_date: Mapped[datetime.date] = mapped_column(
-        Date, nullable=False, default=get_utc_date,
+        Date, nullable=False, default=utc_today,
     )
     last_seen_clock: Mapped[float] = mapped_column(
         Float, nullable=False, default=time.monotonic,
@@ -35,14 +35,25 @@ class Sensor(Base):
     readings: Mapped[list['Reading']] = relationship(back_populates='sensor')
 
     def mark_as_seen(self):
-        self.last_seen_date = get_utc_date()
+        self.last_seen_date = utc_today()
         self.last_seen_clock = time.monotonic()
         return
+
+    def is_online(self):
+        return (
+            self.last_seen_date == utc_today()
+            and (
+                (time.monotonic() - self.last_seen_clock)
+                <= self.availability_tolerance
+            )
+        )
 
 
 class UTCDateTime(TypeDecorator):
 
     impl = DateTime
+
+    cache_ok = True
 
     def process_bind_param(self, value, dialect):
         return value.replace(tzinfo=None)
@@ -81,15 +92,24 @@ class Actuator(Base):
     device_state: Mapped[dict] = mapped_column(JSON, nullable=False)
     device_metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
     timestamp: Mapped[datetime.datetime] = mapped_column(UTCDateTime, nullable=False)
-
+    availability_tolerance: Mapped[float] = mapped_column(Float, nullable=False)
     last_seen_date: Mapped[datetime.date] = mapped_column(
-        Date, nullable=False, default=get_utc_date,
+        Date, nullable=False, default=utc_today,
     )
     last_seen_clock: Mapped[float] = mapped_column(
         Float, nullable=False, default=time.monotonic,
     )
 
     def mark_as_seen(self):
-        self.last_seen_date = get_utc_date()
+        self.last_seen_date = utc_today()
         self.last_seen_clock = time.monotonic()
         return
+
+    def is_online(self):
+        return (
+            self.last_seen_date == utc_today()
+            and (
+                (time.monotonic() - self.last_seen_clock)
+                <= self.availability_tolerance
+            )
+        )

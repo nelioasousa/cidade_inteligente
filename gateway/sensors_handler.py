@@ -1,47 +1,8 @@
-import json
-import time
 import socket
 import logging
 import datetime
 from db.repositories import get_sensors_repository
-from messages_pb2 import SensorReading, SensorsReport
-
-
-def sensors_report_generator(args):
-    sensors_repository = get_sensors_repository()
-    logger = logging.getLogger('SENSORS_REPORT_GENERATOR')
-    logger.info('Iniciando o gerador de relatórios dos sensores')
-    while not args.stop_flag.is_set():
-        sensors = sensors_repository.get_all_sensors()
-        today = datetime.datetime.now(datetime.UTC).date()
-        now_clock = time.monotonic()
-        tolerance = args.sensors_tolerance
-        summary = []
-        for sensor in sensors:
-            readings = sensors_repository.get_sensor_readings(sensor.id, sensor.category)
-            try:
-                last_reading = readings[-1]
-            except IndexError:
-                continue
-            is_online = (
-                sensor.last_seen_date == today
-                and (now_clock - sensor.last_seen_clock) <= tolerance
-            )
-            summary.append(SensorReading(
-                device_name=f'{sensor.category}-{sensor.id}',
-                reading_value=last_reading.value,
-                timestamp=last_reading.timestamp.isoformat(),
-                metadata=json.dumps(sensor.device_metadata),
-                is_online=is_online,
-            ))
-        logger.debug(
-            'Novo relatório gerado: %d sensores reportados',
-            len(sensors),
-        )
-        report = SensorsReport(devices=summary).SerializeToString()
-        with args.db_sensors_report_lock:
-            args.sensors_report = report
-        time.sleep(args.reports_gen_interval)
+from messages_pb2 import SensorReading
 
 
 def sensors_listener(args):

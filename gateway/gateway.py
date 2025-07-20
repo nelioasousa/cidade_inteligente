@@ -2,13 +2,13 @@ import sys
 import socket
 import threading
 import logging
-from db.sessions import init_db
-from registration_handler import multicast_location, registration_listener
-from sensors_handler import sensors_listener, sensors_report_generator
-from actuators_handler import actuators_listener, actuators_report_generator
-from clients_handler import clients_listener
 from functools import wraps
-from messages_pb2 import SensorsReport, ActuatorsReport
+from api import app
+from registration_handler import multicast_location, registration_listener
+from sensors_handler import sensors_listener
+from actuators_handler import actuators_listener
+from clients_handler import clients_listener
+from db.sessions import init_db
 
 
 def stop_wrapper(func, stop_flag):
@@ -40,35 +40,27 @@ def _run(args):
             target=stop_wrapper(actuators_listener, args.stop_flag),
             args=(args,)
         )
+        clistener = threading.Thread(
+            target=stop_wrapper(clients_listener, args.stop_flag),
+            args=(args,)
+        )
         multicaster = threading.Thread(
             target=stop_wrapper(multicast_location, args.stop_flag),
-            args=(args,)
-        )
-        sgenerator = threading.Thread(
-            target=stop_wrapper(sensors_report_generator, args.stop_flag),
-            args=(args,)
-        )
-        agenerator = threading.Thread(
-            target=stop_wrapper(actuators_report_generator, args.stop_flag),
             args=(args,)
         )
         rlistener.start()
         slistener.start()
         alistener.start()
+        clistener.start()
         multicaster.start()
-        sgenerator.start()
-        agenerator.start()
-        clients_listener(args)
-    except KeyboardInterrupt:
-        print('\nSHUTTING DOWN...')
+        app.run(port=8080)
     finally:
         args.stop_flag.set()
         rlistener.join()
         slistener.join()
         alistener.join()
+        clistener.join()
         multicaster.join()
-        sgenerator.join()
-        agenerator.join()
 
 
 def main():
@@ -113,7 +105,8 @@ def main():
 
     parser.add_argument(
         '-l', '--level', type=str, default='INFO',
-        help='Nível do logging. Valores permitidos são "DEBUG", "INFO", "WARN" e "ERROR".'
+        choices=['DEBUG', 'INFO', 'WARN', 'ERROR'],
+        help='Nível do logging.'
     )
 
     parser.add_argument(
@@ -122,10 +115,6 @@ def main():
     )
 
     args = parser.parse_args()
-
-    # Logging
-    lvl = args.level.strip().upper()
-    args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
 
     # Timeouts
     args.base_timeout = 1.0
@@ -139,20 +128,9 @@ def main():
     # Stop event
     args.stop_flag = threading.Event()
 
-    # Reports
-    args.reports_gen_interval = 5
-
-    # Sensors utilities
+    # Tolerances
     args.sensors_tolerance = 6.0
-    args.db_sensors_report_lock = threading.Lock()
-    args.sensors_report = SensorsReport(devices=[]).SerializeToString(),
-
-    # Actuators utilities
     args.actuators_tolerance = 6.0
-    args.pending_actuators_updates = threading.Event()
-    args.pending_actuators_updates.set()
-    args.db_actuators_report_lock = threading.Lock()
-    args.actuators_report = ActuatorsReport(devices=[]).SerializeToString(),
 
     return _run(args)
 

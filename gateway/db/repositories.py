@@ -24,6 +24,7 @@ class SensorRepository:
         sensor_category: str,
         ip_address: str,
         device_metadata: dict[str, Any],
+        availability_tolerance: float = 10.0,
     ):
         sensor = self.get_sensor(sensor_id, sensor_category)
         if sensor is None:
@@ -33,6 +34,7 @@ class SensorRepository:
                     category=sensor_category,
                     ip_address=ip_address,
                     device_metadata=device_metadata,
+                    availability_tolerance=availability_tolerance,
                 )
                 session.add(sensor)
         else:
@@ -40,6 +42,7 @@ class SensorRepository:
                 sensor = session.merge(sensor)
                 sensor.ip_address = ip_address
                 sensor.device_metadata = device_metadata
+                sensor.availability_tolerance = availability_tolerance
                 sensor.mark_as_seen()
         return sensor
 
@@ -55,6 +58,14 @@ class SensorRepository:
             readings = sensor.readings
         readings.sort(key=(lambda x: x.timestamp))
         return readings
+
+    def get_sensor_last_reading(self, sensor_id: int, sensor_category: str):
+        stmt = select(Reading).where(
+            Reading.sensor_id == sensor_id,
+            Reading.sensor_category == sensor_category,
+        ).order_by(Reading.timestamp.desc()).limit(1)
+        with self.session_maker() as session:
+            return session.scalars(stmt).first()
 
     def get_all_sensors(self):
         stmt = select(Sensor)
@@ -110,6 +121,7 @@ class ActuatorRepository:
         device_state: dict[str, Any],
         device_metadata: dict[str, Any],
         timestamp: datetime.datetime,
+        availability_tolerance: float = 10.0,
     ):
         actuator = self.get_actuator(actuator_id, actuator_category)
         if actuator is None:
@@ -122,6 +134,7 @@ class ActuatorRepository:
                     device_state=device_state,
                     device_metadata=device_metadata,
                     timestamp=timestamp,
+                    availability_tolerance=availability_tolerance,
                 )
                 session.add(actuator)
         else:
@@ -132,6 +145,7 @@ class ActuatorRepository:
                 actuator.device_state = device_state
                 actuator.device_metadata = device_metadata
                 actuator.timestamp = timestamp
+                actuator.availability_tolerance = availability_tolerance
         return actuator
 
     def get_actuator(self, actuator_id: int, actuator_category: str):
