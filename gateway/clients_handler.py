@@ -1,8 +1,6 @@
-import time
 import json
 import socket
 import logging
-import datetime
 from struct import pack
 from actuators_handler import send_actuator_command
 from concurrent.futures import ThreadPoolExecutor
@@ -14,52 +12,40 @@ from messages_pb2 import ReplyStatus, ClientReply
 from messages_pb2 import ActuatorUpdate, CommandType, ComplyStatus
 
 
-def get_sensors_report(args):
+def get_sensors_report():
     sensors_repository = get_sensors_repository()
     sensors = sensors_repository.get_all_sensors()
-    today = datetime.datetime.now(datetime.UTC).date()
-    now_clock = time.monotonic()
     sensors_summary = []
     for sensor in sensors:
         reading = sensors_repository.get_sensor_last_reading(sensor.id, sensor.category)
         if reading is None:
             continue
-        is_online = (
-            sensor.last_seen_date == today
-            and (now_clock - sensor.last_seen_clock) <= args.sensors_tolerance
-        )
         sensors_summary.append(SensorReading(
             device_name=f'{sensor.category}-{sensor.id}',
             reading_value=reading.value,
             timestamp=reading.timestamp.isoformat(),
             metadata=json.dumps(sensor.device_metadata),
-            is_online=is_online,
+            is_online=sensor.is_online(),
         ))
     return SensorsReport(devices=sensors_summary).SerializeToString()
 
 
-def get_actuators_report(args):
+def get_actuators_report():
     actuators_repository = get_actuators_repository()
     actuators = actuators_repository.get_all_actuators()
-    today = datetime.datetime.now(datetime.UTC).date()
-    now_clock = time.monotonic()
     actuators_summary = []
     for actuator in actuators:
-        is_online = (
-            actuator.last_seen_date == today
-            and (now_clock - actuator.last_seen_clock) <= args.actuators_tolerance
-        )
         actuators_summary.append(ActuatorUpdate(
             device_name=f'{actuator.category}-{actuator.id}',
             state=json.dumps(actuator.device_state),
             metadata=json.dumps(actuator.device_metadata),
             timestamp=actuator.timestamp.isoformat(),
-            is_online=is_online,
+            is_online=actuator.is_online(),
         ))
     return ActuatorsReport(devices=actuators_summary).SerializeToString()
 
 
-def build_sensor_data(args, device_name):
+def build_sensor_data(device_name):
     sensors_repository = get_sensors_repository()
     sensor_category, sensor_id = device_name.split('-')
     sensor_id = int(sensor_id)
@@ -74,37 +60,27 @@ def build_sensor_data(args, device_name):
         )
         for reading in readings
     ]
-    ls_date = sensor.last_seen_date
-    ls_clock = sensor.last_seen_clock
-    is_online = (
-        ls_date == datetime.datetime.now(datetime.UTC).date()
-        and (time.monotonic() - ls_clock) <= args.sensors_tolerance
-    )
     return SensorData(
         device_name=device_name,
         metadata=json.dumps(sensor.device_metadata),
         readings=readings,
-        is_online=is_online,
+        is_online=sensor.is_online(),
     )
 
 
-def build_actuator_update(args, device_name):
+def build_actuator_update(device_name):
     actuators_repository = get_actuators_repository()
     actuator_category, actuator_id = device_name.split('-')
     actuator_id = int(actuator_id)
     actuator = actuators_repository.get_actuator(actuator_id, actuator_category)
     if actuator is None:
         return None
-    is_online = (
-        actuator.last_seen_date == datetime.datetime.now(datetime.UTC).date()
-        and (time.monotonic() - actuator.last_seen_clock) <= args.actuators_tolerance
-    )
     return ActuatorUpdate(
         device_name=device_name,
         state=json.dumps(actuator.device_state),
         metadata=json.dumps(actuator.device_metadata),
         timestamp=actuator.timestamp.isoformat(),
-        is_online=is_online,
+        is_online=actuator.is_online(),
     )
 
 
@@ -183,16 +159,16 @@ def process_client_request(args, request):
             return ClientReply(
                 status=ReplyStatus.RS_OK,
                 reply_to=RequestType.RT_GET_SENSORS_REPORT,
-                data=get_sensors_report(args),
+                data=get_sensors_report(),
             )
         case RequestType.RT_GET_ACTUATORS_REPORT:
             return ClientReply(
                 status=ReplyStatus.RS_OK,
                 reply_to=RequestType.RT_GET_ACTUATORS_REPORT,
-                data=get_actuators_report(args),
+                data=get_actuators_report(),
             )
         case RequestType.RT_GET_SENSOR_DATA:
-            data = build_sensor_data(args, request.device_name)
+            data = build_sensor_data(request.device_name)
             if data is None:
                 return ClientReply(
                     status=ReplyStatus.RS_UNKNOWN_DEVICE,
@@ -204,7 +180,7 @@ def process_client_request(args, request):
                 data=data.SerializeToString(),
             )
         case RequestType.RT_GET_ACTUATOR_UPDATE:
-            update = build_actuator_update(args, request.device_name)
+            update = build_actuator_update(request.device_name)
             if update is None:
                 return ClientReply(
                     status=ReplyStatus.RS_UNKNOWN_DEVICE,
