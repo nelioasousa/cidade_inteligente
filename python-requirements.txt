@@ -2,5 +2,6 @@ protobuf
 sqlalchemy
 Flask
 Flask-RESTful
+flask-cors
 PyYAML
 pika
