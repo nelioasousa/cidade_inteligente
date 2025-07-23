@@ -7,12 +7,12 @@ import random
 import threading
 import logging
 from functools import wraps
+import pika
 from messages_pb2 import Address, SensorReading
-from messages_pb2 import DeviceType, DeviceInfo, JoinRequest, JoinReply
 
 
-def gateway_discoverer(args):
-    logger = logging.getLogger('GATEWAY_DISCOVERER')
+def broker_discoverer(args):
+    logger = logging.getLogger('BROKER_DISCOVERER')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(('', args.multicast_port))
@@ -22,7 +22,7 @@ def gateway_discoverer(args):
             socket.inet_aton(args.multicast_ip) + socket.inet_aton('0.0.0.0'),
         )
         logger.info(
-            'Procurando pelo Gateway no grupo multicast (%s, %s)',
+            'Procurando broker no grupo multicast (%s, %s)',
             args.multicast_ip,
             args.multicast_port,
         )
@@ -34,71 +34,40 @@ def gateway_discoverer(args):
             except TimeoutError:
                 seq_fails += 1
                 if (
-                    args.gateway_ip is not None
+                    args.message_broker_ip is not None
                     and seq_fails >= args.disconnect_after
                 ):
                     logger.warning(
-                        'Gateway em %s está offline: falhou %d '
-                        'transmissões em sequência. Desconectando...',
-                        args.gateway_ip,
-                        args.disconnect_after,
+                        'Gateway está offline. Parando transmissão de leituras...'
                     )
                     disconnect_device(args)
                 continue
-            gateway_addrs = Address()
-            gateway_addrs.ParseFromString(msg)
+            addresses = Address()
+            addresses.ParseFromString(msg)
             seq_fails = 0
-            if gateway_addrs.ip == args.gateway_ip:
+            if addresses.broker_ip == args.message_broker_ip:
                 continue
-            if args.gateway_ip is not None:
+            if args.message_broker_ip is not None:
                 logger.warning(
-                    'Gateway realocado de %s para %s. Desconectando...',
-                    args.gateway_ip,
-                    gateway_addrs.ip,
+                    'Broker realocado de %s para %s. Desconectando...',
+                    args.message_broker_ip,
+                    addresses.broker_ip,
                 )
                 disconnect_device(args)
-            try_to_register(args, (gateway_addrs.ip, gateway_addrs.port), logger)
+            register_broker(args, addresses.broker_ip, addresses.broker_port)
 
 
 def disconnect_device(args):
-    with args.connection_lock:
-        args.gateway_ip = None
-        args.transmission_port = None
-    return
+    with args.address_lock:
+        args.message_broker_ip = None
+        args.message_broker_port = None
+    args.disconnect_flag.set()
 
 
-def try_to_register(args, address, logger):
-    logger.info('Tentando registro no endereço %s', address)
-    sensor_info = DeviceInfo(
-        type=DeviceType.DT_SENSOR,
-        name=args.name,
-        metadata=json.dumps(args.metadata),
-    )
-    sensor_addrs = Address(ip=args.host_ip, port=0)
-    join_request = JoinRequest(
-        device_info=sensor_info, device_address=sensor_addrs,
-    )
-    join_request = join_request.SerializeToString()
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(args.base_timeout)
-        try:
-            sock.connect(address)
-            sock.send(join_request)
-            join_reply = JoinReply()
-            join_reply.ParseFromString(sock.recv(1024))
-        except Exception as e:
-            logger.warning(
-                'Erro durante tentativa de registro em %s: (%s) %s',
-                address,
-                type(e).__name__,
-                e,
-            )
-            return
-    with args.connection_lock:
-        args.gateway_ip = address[0]
-        args.transmission_port = join_reply.report_port
-    logger.info('Registro bem-sucedido com o Gateway em %s', address[0])
-    return
+def register_broker(args, broker_ip, broker_port):
+    with args.address_lock:
+        args.message_broker_ip = broker_ip
+        args.message_broker_port = broker_port
 
 
 def get_reading(args):
@@ -108,26 +77,64 @@ def get_reading(args):
     return temp
 
 
-def transmit_readings(args):
-    logger = logging.getLogger('READINGS_TRANSMITER')
-    logger.info('Começando a transmissão de leituras para o Gateway')
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        while not args.stop_flag.is_set():
-            with args.connection_lock:
-                addrs = (args.gateway_ip, args.transmission_port)
-            if addrs[0] is None:
-                logger.info('Transmissão interrompida. Sem conexão com o Gateway')
-                time.sleep(2.0)
-                continue
-            reading = SensorReading(
-                device_name=args.name,
-                reading_value=get_reading(args),
-                timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
-                metadata=json.dumps(args.metadata),
+def publish_readings(args):
+    logger = logging.getLogger('READINGS_PUBLISHER')
+    while not args.stop_flag.is_set():
+        with args.address_lock:
+            broker_ip = args.message_broker_ip
+            broker_port = args.message_broker_port
+        if broker_ip is None:
+            logger.info('Sem conexão com o Broker')
+            time.sleep(1.0)
+            continue
+        connection = pika.BlockingConnection(
+            pika.ConnectionParameters(
+                host=broker_ip,
+                port=broker_port,
+                socket_timeout=args.base_timeout,
             )
-            sock.sendto(reading.SerializeToString(), addrs)
-            logger.debug('Leitura de temperatura enviada para %s', addrs)
-            time.sleep(args.report_interval)
+        )
+        channel = connection.channel()
+        try:
+            channel.exchange_declare(exchange='readings', exchange_type='fanout')
+            while (
+                not args.stop_flag.is_set()
+                and not args.disconnect_flag.is_set()
+            ):
+                reading = SensorReading(
+                    device_name=args.name,
+                    reading_value=get_reading(args),
+                    timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
+                    metadata=json.dumps(args.metadata),
+                ).SerializeToString()
+                channel.basic_publish(exchange='logs', routing_key='', body=reading)
+                time.sleep(args.report_interval)
+        finally:
+            channel.close()
+            connection.close()
+            args.disconnect_flag.clear()
+
+
+# def transmit_readings(args):
+#     logger = logging.getLogger('READINGS_TRANSMITER')
+#     logger.info('Começando a transmissão de leituras para o Gateway')
+#     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+#         while not args.stop_flag.is_set():
+#             with args.address_lock:
+#                 addrs = (args.gateway_ip, args.transmission_port)
+#             if addrs[0] is None:
+#                 logger.info('Transmissão interrompida. Sem conexão com o Gateway')
+#                 time.sleep(2.0)
+#                 continue
+#             reading = SensorReading(
+#                 device_name=args.name,
+#                 reading_value=get_reading(args),
+#                 timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
+#                 metadata=json.dumps(args.metadata),
+#             )
+#             sock.sendto(reading.SerializeToString(), addrs)
+#             logger.debug('Leitura de temperatura enviada para %s', addrs)
+#             time.sleep(args.report_interval)
 
 
 def stop_wrapper(func, stop_flag):
@@ -147,17 +154,17 @@ def _run(args):
         format='[%(levelname)s %(asctime)s] %(name)s\n  %(message)s',
     )
     try:
-        transmiter = threading.Thread(
-            target=stop_wrapper(transmit_readings, args.stop_flag),
+        publisher = threading.Thread(
+            target=stop_wrapper(publish_readings, args.stop_flag),
             args=(args,)
         )
-        transmiter.start()
-        gateway_discoverer(args)
+        publisher.start()
+        broker_discoverer(args)
     except KeyboardInterrupt:
         print('\nSHUTTING DOWN...')
     finally:
         args.stop_flag.set()
-        transmiter.join()
+        publisher.join()
 
 
 def main():
@@ -178,6 +185,16 @@ def main():
     parser.add_argument(
         '--multicast_port', type=int, default=50444,
         help='Porta na qual escutar por mensagens do grupo multicast.'
+    )
+
+    parser.add_argument(
+        '--message_broker_ip', type=str, default='localhost',
+        help='Endereço IP do message broker.'
+    )
+
+    parser.add_argument(
+        '--message_broker_port', type=int, default=5672,
+        help='Porta de comunicação com o message broker.'
     )
 
     parser.add_argument(
@@ -226,9 +243,9 @@ def main():
     # Host IP
     args.host_ip = socket.gethostbyname('localhost')
 
-    # Gateway
-    args.gateway_ip = None
-    args.transmission_port = None
+    # Broker
+    args.message_broker_ip = None
+    args.message_broker_port = None
 
     # Metadata
     args.metadata = {
@@ -239,7 +256,8 @@ def main():
 
     # Events and locks
     args.stop_flag = threading.Event()
-    args.connection_lock = threading.Lock()
+    args.disconnect_flag = threading.Event()
+    args.address_lock = threading.Lock()
 
     return _run(args)
 

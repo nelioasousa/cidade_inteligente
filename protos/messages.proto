@@ -5,6 +5,8 @@ syntax = "proto3";
 message Address {
   string ip = 1;
   uint32 port = 2;
+  string broker_ip = 3;
+  uint32 broker_port = 4;
 }
 
 

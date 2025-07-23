@@ -7,3 +7,5 @@ multicast_port: 50444
 multicast_interval: 2.5
 sensors_tolerance: 6.0
 actuators_tolerance: 6.0
+broker_ip: "localhost"
+broker_port: 5672

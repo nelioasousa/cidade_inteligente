@@ -5,7 +5,7 @@ import logging
 from functools import wraps
 from api import app
 from registration_handler import multicast_location, registration_listener
-from sensors_handler import sensors_listener
+from sensors_handler import sensors_consumer
 from actuators_handler import actuators_listener
 from clients_handler import clients_listener
 from db.sessions import init_db
@@ -47,11 +47,12 @@ def _run():
                 configs.actuators_tolerance,
             ),
         )
-        slistener = threading.Thread(
-            target=stop_wrapper(sensors_listener, stop_flag),
+        sconsumer = threading.Thread(
+            target=stop_wrapper(sensors_consumer, stop_flag),
             args=(
                 stop_flag,
-                configs.sensors_port,
+                configs.broker_ip,
+                configs.broker_port,
             ),
         )
         alistener = threading.Thread(
@@ -80,7 +81,7 @@ def _run():
             ),
         )
         rlistener.start()
-        slistener.start()
+        sconsumer.start()
         alistener.start()
         clistener.start()
         multicaster.start()
@@ -88,7 +89,7 @@ def _run():
     finally:
         stop_flag.set()
         rlistener.join()
-        slistener.join()
+        sconsumer.join()
         alistener.join()
         clistener.join()
         multicaster.join()
