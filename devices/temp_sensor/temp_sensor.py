@@ -107,7 +107,7 @@ def publish_readings(args):
                     timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
                     metadata=json.dumps(args.metadata),
                 ).SerializeToString()
-                channel.basic_publish(exchange='logs', routing_key='', body=reading)
+                channel.basic_publish(exchange='readings', routing_key='', body=reading)
                 time.sleep(args.report_interval)
         finally:
             channel.close()

@@ -77,6 +77,8 @@ def _run():
                 configs.multicast_ip,
                 configs.multicast_port,
                 configs.multicast_interval,
+                configs.broker_ip,
+                configs.broker_port,
                 configs.registration_port,
             ),
         )

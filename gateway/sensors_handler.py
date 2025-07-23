@@ -14,7 +14,6 @@ def sensors_consumer(stop_flag, message_broker_ip, message_broker_port):
     def callback(ch, method, properties, body):
         if stop_flag.is_set():
             ch.stop_consuming()
-            return
         return register_reading(body)
     connection = pika.BlockingConnection(
         pika.ConnectionParameters(

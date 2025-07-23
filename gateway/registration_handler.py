@@ -14,6 +14,8 @@ def multicast_location(
     multicast_ip,
     multicast_port,
     multicast_interval,
+    broker_ip,
+    broker_port,
     registration_port,
 ):
     logger = logging.getLogger('MULTICASTER')
@@ -22,7 +24,12 @@ def multicast_location(
         multicast_ip,
         multicast_port,
     )
-    addrs = Address(ip=host_ip, port=registration_port)
+    addrs = Address(
+        ip=host_ip,
+        port=registration_port,
+        broker_ip=broker_ip,
+        broker_port=broker_port,
+    )
     addrs = addrs.SerializeToString()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
