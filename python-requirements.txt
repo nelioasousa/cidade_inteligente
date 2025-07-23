@@ -3,3 +3,4 @@ sqlalchemy
 Flask
 Flask-RESTful
 PyYAML
+pika
