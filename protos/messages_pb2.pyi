@@ -73,12 +73,16 @@ RS_UNKNOWN_DEVICE: ReplyStatus
 RS_UNKNOWN_ACTION: ReplyStatus
 
 class Address(_message.Message):
-    __slots__ = ("ip", "port")
+    __slots__ = ("ip", "port", "broker_ip", "broker_port")
     IP_FIELD_NUMBER: _ClassVar[int]
     PORT_FIELD_NUMBER: _ClassVar[int]
+    BROKER_IP_FIELD_NUMBER: _ClassVar[int]
+    BROKER_PORT_FIELD_NUMBER: _ClassVar[int]
     ip: str
     port: int
-    def __init__(self, ip: _Optional[str] = ..., port: _Optional[int] = ...) -> None: ...
+    broker_ip: str
+    broker_port: int
+    def __init__(self, ip: _Optional[str] = ..., port: _Optional[int] = ..., broker_ip: _Optional[str] = ..., broker_port: _Optional[int] = ...) -> None: ...
 
 class DeviceInfo(_message.Message):
     __slots__ = ("type", "name", "state", "metadata", "timestamp")
