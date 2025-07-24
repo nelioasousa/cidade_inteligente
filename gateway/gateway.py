@@ -35,9 +35,9 @@ def load_configs():
 
 
 def _run():
+    stop_flag = threading.Event()
     try:
         configs = load_configs()
-        stop_flag = threading.Event()
         se_consumer = threading.Thread(
             target=stop_wrapper(sensors_consumer, stop_flag),
             args=(
@@ -91,12 +91,14 @@ def _run():
         re_listener.start()
         multicaster.start()
         app.run(port=configs.api_port)
+    except KeyboardInterrupt:
+        print('\nSHUTTING DOWN...')
     finally:
         stop_flag.set()
-        re_listener.join()
         se_consumer.join()
         ac_listener.join()
         cl_listener.join()
+        re_listener.join()
         multicaster.join()
 
 

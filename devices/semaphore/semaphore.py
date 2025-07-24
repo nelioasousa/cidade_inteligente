@@ -360,11 +360,6 @@ def stop_wrapper(func, stop_flag):
 
 
 def _run(args):
-    logging.basicConfig(
-        level=args.level,
-        handlers=(logging.StreamHandler(sys.stdout),),
-        format='[%(levelname)s %(asctime)s] %(name)s\n  %(message)s',
-    )
     try:
         reporter = threading.Thread(
             target=stop_wrapper(state_change_reporter, args.stop_flag),
@@ -386,9 +381,9 @@ def _run(args):
         print('\nSHUTTING DOWN...')
     finally:
         args.stop_flag.set()
-        discoverer.join()
-        listener.join()
         reporter.join()
+        listener.join()
+        discoverer.join()
 
 
 def main():
@@ -423,16 +418,20 @@ def main():
 
     parser.add_argument(
         '-l', '--level', type=str, default='INFO',
-        help='Nível do logging. Valores permitidos são "DEBUG", "INFO", "WARN", "ERROR".'
+        choices=['DEBUG', 'INFO', 'WARN', 'ERROR'],
+        help='Nível do logging.'
     )
 
     args = parser.parse_args()
 
     # Logging
-    lvl = args.level.strip().upper()
-    args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
-    
-    # Identifier
+    logging.basicConfig(
+        level=args.level,
+        handlers=(logging.StreamHandler(sys.stdout),),
+        format='[%(levelname)s %(asctime)s] %(name)s\n  %(message)s',
+    )
+
+    # Device name
     args.name = f'semaphore-{args.id}'
 
     # Timeouts
