@@ -67,18 +67,22 @@ class Sensor(Resource):
         sensor = sensors_repository.get_sensor(sensor_id, sensor_category)
         if sensor is None:
             abort(404, message=f'Sensor {sensor_category}-{sensor_id} not found')
-        last_reading = sensors_repository.get_sensor_last_reading(
-            sensor.id,
-            sensor.category,
-        )
+        readings = [
+            {
+                'timestamp': reading.timestamp.isoformat(),
+                'value': reading.value,
+            }
+            for reading in sensors_repository.get_sensor_readings(
+                sensor.id,
+                sensor.category,
+            )
+        ]
         return {
             'deviceId': sensor.id,
             'deviceCategory': sensor.category,
             'isOnline': sensor.is_online(),
-            'lastReading': dict() if last_reading is None else {
-                'timestamp': last_reading.timestamp.isoformat(),
-                'value': last_reading.value,
-            },
+            'readings': readings,
+            'lastReading': readings[-1] if readings else {},
             'metadata': sensor.device_metadata,
         }
 
