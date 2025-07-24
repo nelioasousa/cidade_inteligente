@@ -303,6 +303,8 @@ def main():
     args = parser.parse_args()
 
     # Logging
+    pika_logger = logging.getLogger('pika')
+    pika_logger.propagate = False
     logging.basicConfig(
         level=args.level,
         handlers=(logging.StreamHandler(sys.stdout),),
