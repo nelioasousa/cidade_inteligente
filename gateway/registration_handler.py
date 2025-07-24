@@ -8,21 +8,30 @@ from db.repositories import get_sensors_repository, get_actuators_repository
 from messages_pb2 import Address, JoinRequest, JoinReply, DeviceType
 
 
-def multicast_location(
+def multicast_locations(
     stop_flag,
-    host_ip,
     multicast_ip,
     multicast_port,
     multicast_interval,
+    host_ip,
     registration_port,
+    broker_ip,
+    broker_port,
+    publish_exchange,
 ):
     logger = logging.getLogger('MULTICASTER')
     logger.info(
-        'Enviando endereço de registro para grupo multicast (%s, %s)',
+        'Enviando endereços para grupo multicast (%s, %s)',
         multicast_ip,
         multicast_port,
     )
-    addrs = Address(ip=host_ip, port=registration_port)
+    addrs = Address(
+        ip=host_ip,
+        port=registration_port,
+        broker_ip=broker_ip,
+        broker_port=broker_port,
+        publish_exchange=publish_exchange,
+    )
     addrs = addrs.SerializeToString()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
@@ -40,7 +49,6 @@ def multicast_location(
 
 
 def registration_handler(
-    sensors_port,
     sensors_tolerance,
     actuators_port,
     actuators_tolerance,
@@ -60,7 +68,7 @@ def registration_handler(
         match request.device_info.type:
             case DeviceType.DT_SENSOR:
                 sensors_repository = get_sensors_repository()
-                report_port = sensors_port
+                reply = JoinReply()
                 metadata = json.loads(device_info.metadata)
                 sensors_repository.add_sensor(
                     sensor_id=device_id,
@@ -71,7 +79,7 @@ def registration_handler(
                 )
             case DeviceType.DT_ACTUATOR:
                 actuators_repository = get_actuators_repository()
-                report_port = actuators_port
+                reply = JoinReply(report_port=actuators_port)
                 state = json.loads(device_info.state)
                 metadata = json.loads(device_info.metadata)
                 timestamp = datetime.fromisoformat(device_info.timestamp)
@@ -87,7 +95,6 @@ def registration_handler(
                 )
             case _:
                 raise ValueError('Invalid DeviceType')
-        reply = JoinReply(report_port=report_port)
         sock.send(reply.SerializeToString())
         logger.info('Ingresso bem-sucedido: %s', device_info.name)
     except Exception as e:
@@ -113,7 +120,6 @@ def registration_handler(
 def registration_listener(
     stop_flag,
     registration_port,
-    sensors_port,
     sensors_tolerance,
     actuators_port,
     actuators_tolerance,
@@ -138,7 +144,6 @@ def registration_listener(
                     conn.settimeout(sock.gettimeout())
                     executor.submit(
                         registration_handler,
-                        sensors_port,
                         sensors_tolerance,
                         actuators_port,
                         actuators_tolerance,

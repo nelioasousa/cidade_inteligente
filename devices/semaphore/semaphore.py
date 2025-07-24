@@ -8,6 +8,7 @@ from numbers import Real
 from datetime import datetime, UTC
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
+from google.protobuf.message import DecodeError
 from messages_pb2 import Address
 from messages_pb2 import DeviceType, DeviceInfo, JoinRequest, JoinReply
 from messages_pb2 import ActuatorUpdate
@@ -50,7 +51,10 @@ def gateway_discoverer(args):
                     disconnect_device(args)
                 continue
             gateway_addrs = Address()
-            gateway_addrs.ParseFromString(msg)
+            try:
+                gateway_addrs.ParseFromString(msg)
+            except DecodeError:
+                continue
             seq_fails = 0
             if gateway_addrs.ip == args.gateway_ip:
                 continue
@@ -356,11 +360,6 @@ def stop_wrapper(func, stop_flag):
 
 
 def _run(args):
-    logging.basicConfig(
-        level=args.level,
-        handlers=(logging.StreamHandler(sys.stdout),),
-        format='[%(levelname)s %(asctime)s] %(name)s\n  %(message)s',
-    )
     try:
         reporter = threading.Thread(
             target=stop_wrapper(state_change_reporter, args.stop_flag),
@@ -382,9 +381,9 @@ def _run(args):
         print('\nSHUTTING DOWN...')
     finally:
         args.stop_flag.set()
-        discoverer.join()
-        listener.join()
         reporter.join()
+        listener.join()
+        discoverer.join()
 
 
 def main():
@@ -408,7 +407,7 @@ def main():
     )
 
     parser.add_argument(
-        '--multicast_port', type=int, default=50444,
+        '--multicast_port', type=int, default=50333,
         help='Porta na qual escutar por mensagens do grupo multicast.'
     )
 
@@ -419,16 +418,20 @@ def main():
 
     parser.add_argument(
         '-l', '--level', type=str, default='INFO',
-        help='Nível do logging. Valores permitidos são "DEBUG", "INFO", "WARN", "ERROR".'
+        choices=['DEBUG', 'INFO', 'WARN', 'ERROR'],
+        help='Nível do logging.'
     )
 
     args = parser.parse_args()
 
     # Logging
-    lvl = args.level.strip().upper()
-    args.level = lvl if lvl in ('DEBUG', 'WARN', 'ERROR') else 'INFO'
-    
-    # Identifier
+    logging.basicConfig(
+        level=args.level,
+        handlers=(logging.StreamHandler(sys.stdout),),
+        format='[%(levelname)s %(asctime)s] %(name)s\n  %(message)s',
+    )
+
+    # Device name
     args.name = f'semaphore-{args.id}'
 
     # Timeouts

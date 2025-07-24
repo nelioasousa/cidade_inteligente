@@ -1,7 +1,8 @@
 import json
-from types import SimpleNamespace
+import threading
 from flask import Flask, request
 from flask_restful import Api, Resource, abort
+from werkzeug.serving import make_server
 from actuators_handler import send_actuator_command
 from db.repositories import get_sensors_repository, get_actuators_repository
 from messages_pb2 import CommandType, ComplyStatus
@@ -13,6 +14,24 @@ api = Api(app)
 
 sensors_repository = get_sensors_repository()
 actuators_repository = get_actuators_repository()
+
+
+class ApiServerThread(threading.Thread):
+    def __init__(self, stop_flag, host_ip, port, app):
+        threading.Thread.__init__(self)
+        self.stop_flag = stop_flag
+        self.server = make_server(host_ip, port, app)
+        self.ctx = app.app_context()
+        self.ctx.push()
+
+    def run(self):
+        try:
+            self.server.serve_forever()
+        finally:
+            self.stop_flag.set()
+
+    def shutdown(self):
+        self.server.shutdown()
 
 
 class Sensors(Resource):
@@ -64,22 +83,26 @@ class SensorsByCategory(Resource):
 class Sensor(Resource):
 
     def get(self, sensor_category: str, sensor_id: int):
-        sensor_category = sensor_category.lower()
         sensor = sensors_repository.get_sensor(sensor_id, sensor_category)
         if sensor is None:
             abort(404, message=f'Sensor {sensor_category}-{sensor_id} not found')
-        last_reading = sensors_repository.get_sensor_last_reading(
-            sensor.id,
-            sensor.category,
-        )
+        readings = [
+            {
+                'timestamp': reading.timestamp.isoformat(),
+                'value': reading.value,
+            }
+            for reading in sensors_repository.get_sensor_readings(
+                sensor.id,
+                sensor.category,
+                limit=100,
+            )
+        ]
         return {
             'deviceId': sensor.id,
             'deviceCategory': sensor.category,
             'isOnline': sensor.is_online(),
-            'lastReading': dict() if last_reading is None else {
-                'timestamp': last_reading.timestamp.isoformat(),
-                'value': last_reading.value,
-            },
+            'readings': readings,
+            'lastReading': readings[-1] if readings else {},
             'metadata': sensor.device_metadata,
         }
 
@@ -119,7 +142,6 @@ class ActuatorsByCategory(Resource):
 class Actuator(Resource):
 
     def get(self, actuator_category: str, actuator_id: int):
-        actuator_category = actuator_category.lower()
         actuator = actuators_repository.get_actuator(actuator_id, actuator_category)
         if actuator is None:
             abort(404, message=f'Actuator {actuator_category}-{actuator_id} not found')
@@ -135,7 +157,6 @@ class Actuator(Resource):
     def put(self, actuator_category: str, actuator_id: int):
         data = request.get_json()
         response = send_actuator_command(
-            args=SimpleNamespace(base_timeout=1.0),
             actuator_id=actuator_id,
             actuator_category=actuator_category,
             command_type=CommandType.CT_SET_STATE,
@@ -145,7 +166,7 @@ class Actuator(Resource):
             abort(404, message=f'Actuator {actuator_category}-{actuator_id} not found')
         if response.status is ComplyStatus.CS_INVALID_STATE:
             abort(400, message='Invalid state supplied')
-        if response.status is ComplyStatus.CS_FAIL:
+        if response.status is not ComplyStatus.CS_OK:
             abort(500, message='Something went wrong')
         return {"message": "OK"}, 200
 
@@ -154,7 +175,6 @@ class Actuator(Resource):
         if 'action' not in data:
             abort(400, message='No "action" was specified')
         response = send_actuator_command(
-            args=SimpleNamespace(base_timeout=1.0),
             actuator_id=actuator_id,
             actuator_category=actuator_category,
             command_type=CommandType.CT_ACTION,
@@ -164,7 +184,7 @@ class Actuator(Resource):
             abort(404, message=f'Actuator {actuator_category}-{actuator_id} not found')
         if response.status is ComplyStatus.CS_UNKNOWN_ACTION:
             abort(400, message=f'Unknown action "{data['action']}"')
-        if response.status is ComplyStatus.CS_FAIL:
+        if response.status is not ComplyStatus.CS_OK:
             abort(500, message='Something went wrong')
         return {"message": "OK"}, 200
 

@@ -1,45 +1,72 @@
-import socket
 import logging
 import datetime
+import pika
 from db.repositories import get_sensors_repository
 from messages_pb2 import SensorReading
 
 
-def sensors_listener(stop_flag, sensors_port):
+def register_reading(body):
+    reading = SensorReading()
+    reading.ParseFromString(body)
+    sensor_category, sensor_id = reading.device_name.split('-')
+    sensor_id = int(sensor_id)
     sensors_repository = get_sensors_repository()
-    logger = logging.getLogger('SENSORS_LISTENER')
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(('', sensors_port))
-        logger.info(
-            'Escutando por dados sensoriais na porta %d',
-            sensors_port,
-        )
-        sock.settimeout(1.0)
-        while not stop_flag.is_set():
-            try:
-                msg, addrs = sock.recvfrom(1024)
-            except TimeoutError:
-                continue
-            reading = SensorReading()
-            reading.ParseFromString(msg)
-            sensor_category, sensor_id = reading.device_name.split('-')
-            sensor_id = int(sensor_id)
-            sensor = sensors_repository.get_sensor(sensor_id, sensor_category)
-            if sensor is None:
-                logger.warning(
-                    'Recebendo leituras de um sensor '
-                    'não registrado localizado em %s',
-                    addrs[0],
-                )
-                continue
+    result = sensors_repository.register_sensor_reading(
+        sensor_id=sensor_id,
+        sensor_category=sensor_category,
+        reading_value=reading.reading_value,
+        reading_timestamp=datetime.datetime.fromisoformat(reading.timestamp),
+    )
+    return result, reading.device_name
+
+
+def sensors_consumer(stop_flag, broker_ip, broker_port, publish_exchange):
+    logger = logging.getLogger('SENSORS_CONSUMER')
+    def callback(ch, method, properties, body):
+        try:
+            result, sensor_name = register_reading(body)
+        except Exception as e:
+            logger.error(
+                'Falha ao processar mensagem: (%s) %s',
+                type(e).__name__,
+                e,
+            )
+            return
+        if result:
             logger.debug(
-                'Leitura de sensor recebida: (%s, %s, %.6f)',
-                reading.timestamp,
-                reading.device_name,
-                reading.reading_value,
+                'Leitura de sensor recebida: %s',
+                sensor_name,
             )
-            timestamp = datetime.datetime.fromisoformat(reading.timestamp)
-            sensors_repository.register_sensor_reading(
-                sensor.id, sensor.category, reading.reading_value, timestamp,
+        else:
+            logger.warning(
+                'Recebendo leituras de um sensor não registrado: %s',
+                sensor_name,
             )
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(
+            host=broker_ip,
+            port=broker_port,
+            socket_timeout=1.0,
+        )
+    )
+    channel = connection.channel()
+    try:
+        channel.exchange_declare(
+            exchange=publish_exchange,
+            exchange_type='fanout',
+        )
+        result = channel.queue_declare(queue='', exclusive=True)
+        exclusive_queue = result.method.queue
+        channel.queue_bind(exchange=publish_exchange, queue=exclusive_queue)
+        channel.basic_consume(
+            queue=exclusive_queue,
+            on_message_callback=callback,
+            auto_ack=True,
+        )
+        logger.info('Iniciando consumo de mensagens do Broker...')
+        while not stop_flag.is_set():
+            connection.process_data_events(time_limit=1.0)
+        logger.info('Finalizando consumo de mensagens...')
+    finally:
+        channel.close()
+        connection.close()

@@ -3,9 +3,9 @@ import socket
 import threading
 import logging
 from functools import wraps
-from api import app
-from registration_handler import multicast_location, registration_listener
-from sensors_handler import sensors_listener
+from api import app, ApiServerThread
+from registration_handler import multicast_locations, registration_listener
+from sensors_handler import sensors_consumer
 from actuators_handler import actuators_listener
 from clients_handler import clients_listener
 from db.sessions import init_db
@@ -29,69 +29,85 @@ def load_configs():
     with config_file.open('r') as f:
         configs = SimpleNamespace(**yaml.safe_load(f))
     configs.host_ip = socket.gethostbyname('localhost')
+    if configs.broker_ip == 'localhost':
+        configs.broker_ip = configs.host_ip
     return configs
 
 
 def _run():
+    stop_flag = threading.Event()
     try:
         configs = load_configs()
-        stop_flag = threading.Event()
-        rlistener = threading.Thread(
-            target=stop_wrapper(registration_listener, stop_flag),
+        se_consumer = threading.Thread(
+            target=stop_wrapper(sensors_consumer, stop_flag),
             args=(
                 stop_flag,
-                configs.registration_port,
-                configs.sensors_port,
-                configs.sensors_tolerance,
-                configs.actuators_port,
-                configs.actuators_tolerance,
+                configs.broker_ip,
+                configs.broker_port,
+                configs.publish_exchange,
             ),
         )
-        slistener = threading.Thread(
-            target=stop_wrapper(sensors_listener, stop_flag),
-            args=(
-                stop_flag,
-                configs.sensors_port,
-            ),
-        )
-        alistener = threading.Thread(
+        ac_listener = threading.Thread(
             target=stop_wrapper(actuators_listener, stop_flag),
             args=(
                 stop_flag,
                 configs.actuators_port,
             ),
         )
-        clistener = threading.Thread(
+        cl_listener = threading.Thread(
             target=stop_wrapper(clients_listener, stop_flag),
             args=(
                 stop_flag,
                 configs.clients_port,
             ),
         )
-        multicaster = threading.Thread(
-            target=stop_wrapper(multicast_location, stop_flag),
+        re_listener = threading.Thread(
+            target=stop_wrapper(registration_listener, stop_flag),
             args=(
                 stop_flag,
-                configs.host_ip,
+                configs.registration_port,
+                configs.sensors_tolerance,
+                configs.actuators_port,
+                configs.actuators_tolerance,
+            ),
+        )
+        multicaster = threading.Thread(
+            target=stop_wrapper(multicast_locations, stop_flag),
+            args=(
+                stop_flag,
                 configs.multicast_ip,
                 configs.multicast_port,
                 configs.multicast_interval,
+                configs.host_ip,
                 configs.registration_port,
+                configs.broker_ip,
+                configs.broker_port,
+                configs.publish_exchange,
             ),
         )
-        rlistener.start()
-        slistener.start()
-        alistener.start()
-        clistener.start()
+        api_server = ApiServerThread(
+            stop_flag,
+            configs.host_ip,
+            configs.api_port,
+            app,
+        )
+        se_consumer.start()
+        ac_listener.start()
+        cl_listener.start()
+        re_listener.start()
         multicaster.start()
-        app.run(port=8080)
+        api_server.start()
+        stop_flag.wait()
+    except KeyboardInterrupt:
+        print('\nSHUTTING DOWN...')
     finally:
         stop_flag.set()
-        rlistener.join()
-        slistener.join()
-        alistener.join()
-        clistener.join()
+        se_consumer.join()
+        ac_listener.join()
+        cl_listener.join()
+        re_listener.join()
         multicaster.join()
+        api_server.shutdown()
 
 
 def main():
