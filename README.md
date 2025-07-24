@@ -100,15 +100,13 @@ $ protoc --js_out=import_style=commonjs,binary:. messages.proto
 
 ### 2. Rodar os componentes
 
-**Gateway**
-
-Antes de iniciar o Gateway é necessário subir o Broker. O jeito mais fácil é utilizando docker.
+**Broker**
 
 ```bash
 $ docker run --rm --name rabbitmq --hostname rmq -p 5672:5672 -p 15672:15672 rabbitmq:4-management
 ```
 
-Depois que o Broker estiver rodando, rodar o Gateway.
+**Gateway**
 
 ```bash
 $ cd cidade_inteligente/gateway/
@@ -127,7 +125,6 @@ options:
   -c, --clear           Limpar o banco de dados ao iniciar.
 (venv) $ python gateway.py --clear
 ```
-
 
 **Semáfoto**
 
