@@ -50,14 +50,18 @@ class SensorRepository:
         with self.session_maker() as session:
             return session.get(Sensor, (sensor_id, sensor_category))
 
-    def get_sensor_readings(self, sensor_id: int, sensor_category: str):
+    def get_sensor_readings(self, sensor_id: int, sensor_category: str, limit: int = 200):
         with self.session_maker() as session:
             sensor = session.get(Sensor, (sensor_id, sensor_category))
             if sensor is None:
                 return None
-            readings = sensor.readings
-        readings.sort(key=(lambda x: x.timestamp))
-        return readings
+            stmt = select(Reading).where(
+                Reading.sensor_id == sensor_id,
+                Reading.sensor_category == sensor_category,
+            ).order_by(Reading.timestamp.desc()).limit(limit)
+            readings = session.scalars(stmt).all()
+            readings.reverse()
+            return readings
 
     def get_sensor_last_reading(self, sensor_id: int, sensor_category: str):
         stmt = select(Reading).where(

@@ -75,6 +75,7 @@ class Sensor(Resource):
             for reading in sensors_repository.get_sensor_readings(
                 sensor.id,
                 sensor.category,
+                limit=100,
             )
         ]
         return {

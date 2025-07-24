@@ -1,6 +1,6 @@
 import time
 import datetime
-from sqlalchemy import ForeignKeyConstraint
+from sqlalchemy import Index, ForeignKeyConstraint
 from sqlalchemy import Integer, Float, String
 from sqlalchemy import Date, DateTime
 from sqlalchemy import JSON
@@ -77,6 +77,7 @@ class Reading(Base):
             columns=['sensor_id', 'sensor_category'],
             refcolumns=['sensors.id', 'sensors.category']
         ),
+        Index('idx_readings_timestamp', timestamp.desc()),
     )
 
     sensor: Mapped['Sensor'] = relationship(back_populates='readings')
