@@ -11,12 +11,13 @@ def register_reading(body):
     sensor_category, sensor_id = reading.device_name.split('-')
     sensor_id = int(sensor_id)
     sensors_repository = get_sensors_repository()
-    sensors_repository.register_sensor_reading(
+    result = sensors_repository.register_sensor_reading(
         sensor_id=sensor_id,
         sensor_category=sensor_category,
         reading_value=reading.reading_value,
         reading_timestamp=datetime.datetime.fromisoformat(reading.timestamp),
     )
+    return result, reading.device_name
 
 
 def sensors_consumer(stop_flag, broker_ip, broker_port, publish_exchange):
@@ -24,9 +25,19 @@ def sensors_consumer(stop_flag, broker_ip, broker_port, publish_exchange):
     def callback(ch, method, properties, body):
         logger.debug('Processando nova mensagem do Broker')
         try:
-            register_reading(body)
+            result, sensor_name = register_reading(body)
         except Exception:
             logger.error('Falha ao processar mensagem')
+        if result:
+            logger.debug(
+                'Leitura de sensor recebida: %s',
+                sensor_name,
+            )
+        else:
+            logger.warning(
+                'Recebendo leituras de um sensor não registrado: %s',
+                sensor_name,
+            )
         if stop_flag.is_set():
             logger.info('Parando consumo de mensagens...')
             ch.stop_consuming()
