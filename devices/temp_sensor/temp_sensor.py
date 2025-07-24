@@ -54,12 +54,17 @@ def discoverer(args):
             seq_fails = 0
             if addresses.ip != args.gateway_ip:
                 result = try_registration(args, addresses.ip, addresses.port)
-                logger.warning(
-                    'Falha durante registro em (%s, %d)',
-                    addresses.ip,
-                    addresses.port,
-                )
-                if not result:
+                if result:
+                    logger.info(
+                        'Registro bem-sucedido com Gateway em %s',
+                        args.gateway_ip,
+                    )
+                else:
+                    logger.warning(
+                        'Falha durante registro em (%s, %d)',
+                        addresses.ip,
+                        addresses.port,
+                    )
                     disconnect_broker(args)
                     continue
             if (
