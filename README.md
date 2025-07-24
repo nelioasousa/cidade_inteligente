@@ -18,6 +18,7 @@ Um sistema distribuído para aprendizado de comunicação entre processos. Ele s
 - **Sockets TCP e UDP:** comunicação entre dispositivos;
 - **UDP Multicast:** dispositivos inteligêntes descobrem a localização do gateway usando um grupo multicast;
 - **libprotoc v31.1:** compilação das mensagens `.proto`.
+- **Flutter v3.32.5 *** cliente web/mobile
 
 ## 📦 Estrutura de Diretórios
 
@@ -25,6 +26,7 @@ Um sistema distribuído para aprendizado de comunicação entre processos. Ele s
 cidade_inteligente/
 ├── clients/
 │   └── simple_client/      # Cliente CLI Python
+│   └── client_flutter/     # Cliente interface web flutter
 ├── devices/                # Código dos dispositivos inteligentes
 │   ├── lamp_node/          # Lâmpada inteligente em Node.js
 │   ├── semaphore/          # Semáforo em Python
@@ -170,6 +172,9 @@ libprotoc 31.1
 $ protoc --python_out=. --pyi_out=. messages.proto
 # Node.js
 $ protoc --js_out=import_style=commonjs,binary:. messages.proto
+# Flutter
+$ flutter pub get
+$ flutter run
 ```
 
 ### 2. Rodar os processos
