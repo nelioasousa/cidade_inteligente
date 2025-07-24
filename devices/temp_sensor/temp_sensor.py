@@ -8,6 +8,7 @@ import threading
 import logging
 from functools import wraps
 import pika
+from pika.exceptions import AMQPError
 from google.protobuf.message import DecodeError
 from messages_pb2 import Address, SensorReading
 from messages_pb2 import DeviceType, DeviceInfo, JoinRequest, JoinReply
@@ -141,51 +142,86 @@ def readings_publisher(args):
         with args.broker_lock:
             broker_ip = args.message_broker_ip
             broker_port = args.message_broker_port
+            publish_exchange = args.publish_exchange
         if broker_ip is None:
             logger.info('Sem conexão com o Broker')
             time.sleep(1.0)
             continue
-        connection = pika.BlockingConnection(
-            pika.ConnectionParameters(
-                host=broker_ip,
-                port=broker_port,
-                socket_timeout=args.base_timeout,
-            )
-        )
-        channel = connection.channel()
         try:
-            logger.info(
-                'Conexão bem-sucedida com Broker em (%s, %d)',
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=broker_ip,
+                    port=broker_port,
+                    socket_timeout=args.base_timeout,
+                )
+            )
+            channel = connection.channel()
+            try:
+                logger.info(
+                    'Conexão bem-sucedida com Broker em (%s, %d)',
+                    broker_ip,
+                    broker_port,
+                )
+                channel.exchange_declare(
+                    exchange=publish_exchange,
+                    exchange_type='fanout',
+                )
+                fail_count = 0
+                while (
+                    not args.stop_flag.is_set()
+                    and not args.disconnect_flag.is_set()
+                ):
+                    reading = SensorReading(
+                        device_name=args.name,
+                        reading_value=get_reading(args),
+                        timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
+                    )
+                    reading = reading.SerializeToString()
+                    try:
+                        channel.basic_publish(
+                            exchange=publish_exchange,
+                            routing_key='',
+                            body=reading,
+                        )
+                        fail_count = 0
+                    except Exception as e:
+                        fail_count += 1
+                        logger.error(
+                            'Erro ao enviar mensagem para o Broker: (%s) %s',
+                            type(e).__name__,
+                            e,
+                        )
+                        if fail_count > args.disconnect_after:
+                            logger.warning(
+                                '%d falhas consecutivas no envio de mensagens',
+                                args.disconnect_after,
+                            )
+                            break
+                    time.sleep(args.report_interval)
+                logger.info(
+                    'Encerrando conexão com o Broker em (%s, %d)',
+                    broker_ip,
+                    broker_port,
+                )
+            finally:
+                try:
+                    channel.close()
+                except Exception:
+                    pass
+                try:
+                    connection.close()
+                except Exception:
+                    pass
+        except AMQPError as e:
+            logger.warning(
+                'Falha ao estabelecer conexão com o Broker em (%s, %d): (%s) %s',
                 broker_ip,
                 broker_port,
+                type(e).__name__,
+                e,
             )
-            channel.exchange_declare(
-                exchange=args.publish_exchange,
-                exchange_type='fanout',
-            )
-            while (
-                not args.stop_flag.is_set()
-                and not args.disconnect_flag.is_set()
-            ):
-                reading = SensorReading(
-                    device_name=args.name,
-                    reading_value=get_reading(args),
-                    timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
-                )
-                channel.basic_publish(
-                    exchange=args.publish_exchange,
-                    routing_key='',
-                    body=reading.SerializeToString(),
-                )
-                time.sleep(args.report_interval)
-        finally:
-            logger.info(
-                'Terminando conexão com o Broker em (%s, %d)',
-                broker_ip,
-                broker_port,
-            )
-            channel.close()
-            connection.close()
+            if not args.stop_flag.is_set():
+                time.sleep(2.0)
 
 
 def stop_wrapper(func, stop_flag):

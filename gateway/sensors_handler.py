@@ -1,6 +1,8 @@
+import time
 import logging
 import datetime
 import pika
+from pika.exceptions import AMQPError
 from db.repositories import get_sensors_repository
 from messages_pb2 import SensorReading
 
@@ -42,31 +44,60 @@ def sensors_consumer(stop_flag, broker_ip, broker_port, publish_exchange):
                 'Recebendo leituras de um sensor não registrado: %s',
                 sensor_name,
             )
-    connection = pika.BlockingConnection(
-        pika.ConnectionParameters(
-            host=broker_ip,
-            port=broker_port,
-            socket_timeout=1.0,
-        )
-    )
-    channel = connection.channel()
-    try:
-        channel.exchange_declare(
-            exchange=publish_exchange,
-            exchange_type='fanout',
-        )
-        result = channel.queue_declare(queue='', exclusive=True)
-        exclusive_queue = result.method.queue
-        channel.queue_bind(exchange=publish_exchange, queue=exclusive_queue)
-        channel.basic_consume(
-            queue=exclusive_queue,
-            on_message_callback=callback,
-            auto_ack=True,
-        )
-        logger.info('Iniciando consumo de mensagens do Broker...')
-        while not stop_flag.is_set():
-            connection.process_data_events(time_limit=1.0)
-        logger.info('Finalizando consumo de mensagens...')
-    finally:
-        channel.close()
-        connection.close()
+    while not stop_flag.is_set():
+        try:
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=broker_ip,
+                    port=broker_port,
+                    socket_timeout=1.0,
+                    heartbeat=2,
+                )
+            )
+            channel = connection.channel()
+            try:
+                channel.exchange_declare(
+                    exchange=publish_exchange,
+                    exchange_type='fanout',
+                )
+                result = channel.queue_declare(queue='', exclusive=True)
+                exclusive_queue = result.method.queue
+                channel.queue_bind(exchange=publish_exchange, queue=exclusive_queue)
+                channel.basic_consume(
+                    queue=exclusive_queue,
+                    on_message_callback=callback,
+                    auto_ack=True,
+                )
+                logger.info(
+                    'Consumindo mensagens da exchange %s',
+                    publish_exchange,
+                )
+                while not stop_flag.is_set():
+                    try:
+                        connection.process_data_events(time_limit=1.0)
+                    except Exception as e:
+                        logger.error(
+                            'Erro ao receber nova mensagem: (%s) %s',
+                            type(e).__name__,
+                            e,
+                        )
+                        break
+                logger.info('Interrompendo consumo de mensagens...')
+            finally:
+                try:
+                    channel.close()
+                except Exception:
+                    pass
+                try:
+                    connection.close()
+                except Exception:
+                    pass
+        except AMQPError as e:
+            logger.warning(
+                'Falha ao estabelecer conexão com o Broker: (%s) %s',
+                type(e).__name__,
+                e,
+            )
+            if not stop_flag.is_set():
+                time.sleep(2.0)
+        logger.info('Consumo de mensagens finalizado')
