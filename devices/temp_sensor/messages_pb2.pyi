@@ -107,10 +107,12 @@ class JoinRequest(_message.Message):
     def __init__(self, device_info: _Optional[_Union[DeviceInfo, _Mapping]] = ..., device_address: _Optional[_Union[Address, _Mapping]] = ...) -> None: ...
 
 class JoinReply(_message.Message):
-    __slots__ = ("report_port",)
+    __slots__ = ("report_port", "publish_exchange")
     REPORT_PORT_FIELD_NUMBER: _ClassVar[int]
+    PUBLISH_EXCHANGE_FIELD_NUMBER: _ClassVar[int]
     report_port: int
-    def __init__(self, report_port: _Optional[int] = ...) -> None: ...
+    publish_exchange: str
+    def __init__(self, report_port: _Optional[int] = ..., publish_exchange: _Optional[str] = ...) -> None: ...
 
 class SensorReading(_message.Message):
     __slots__ = ("device_name", "reading_value", "metadata", "timestamp", "is_online")
