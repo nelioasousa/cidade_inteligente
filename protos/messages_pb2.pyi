@@ -2,24 +2,74 @@ from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
-CS_FAIL: ComplyStatus
-CS_INVALID_STATE: ComplyStatus
-CS_OK: ComplyStatus
-CS_UNKNOWN_ACTION: ComplyStatus
-CS_UNSPECIFIED: ComplyStatus
+DESCRIPTOR: _descriptor.FileDescriptor
+
+class DeviceType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    DT_UNSPECIFIED: _ClassVar[DeviceType]
+    DT_SENSOR: _ClassVar[DeviceType]
+    DT_ACTUATOR: _ClassVar[DeviceType]
+
+class CommandType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    CT_UNSPECIFIED: _ClassVar[CommandType]
+    CT_ACTION: _ClassVar[CommandType]
+    CT_GET_STATE: _ClassVar[CommandType]
+    CT_SET_STATE: _ClassVar[CommandType]
+
+class ComplyStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    CS_UNSPECIFIED: _ClassVar[ComplyStatus]
+    CS_OK: _ClassVar[ComplyStatus]
+    CS_FAIL: _ClassVar[ComplyStatus]
+    CS_UNKNOWN_ACTION: _ClassVar[ComplyStatus]
+    CS_INVALID_STATE: _ClassVar[ComplyStatus]
+
+class RequestType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    RT_UNSPECIFIED: _ClassVar[RequestType]
+    RT_GET_SENSORS_REPORT: _ClassVar[RequestType]
+    RT_GET_ACTUATORS_REPORT: _ClassVar[RequestType]
+    RT_GET_SENSOR_DATA: _ClassVar[RequestType]
+    RT_GET_ACTUATOR_UPDATE: _ClassVar[RequestType]
+    RT_SET_ACTUATOR_STATE: _ClassVar[RequestType]
+    RT_RUN_ACTUATOR_ACTION: _ClassVar[RequestType]
+
+class ReplyStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    RS_UNSPECIFIED: _ClassVar[ReplyStatus]
+    RS_OK: _ClassVar[ReplyStatus]
+    RS_FAIL: _ClassVar[ReplyStatus]
+    RS_INVALID_STATE: _ClassVar[ReplyStatus]
+    RS_UNKNOWN_DEVICE: _ClassVar[ReplyStatus]
+    RS_UNKNOWN_ACTION: _ClassVar[ReplyStatus]
+DT_UNSPECIFIED: DeviceType
+DT_SENSOR: DeviceType
+DT_ACTUATOR: DeviceType
+CT_UNSPECIFIED: CommandType
 CT_ACTION: CommandType
 CT_GET_STATE: CommandType
 CT_SET_STATE: CommandType
-CT_UNSPECIFIED: CommandType
-DESCRIPTOR: _descriptor.FileDescriptor
-DT_ACTUATOR: DeviceType
-DT_SENSOR: DeviceType
-DT_UNSPECIFIED: DeviceType
+CS_UNSPECIFIED: ComplyStatus
+CS_OK: ComplyStatus
+CS_FAIL: ComplyStatus
+CS_UNKNOWN_ACTION: ComplyStatus
+CS_INVALID_STATE: ComplyStatus
+RT_UNSPECIFIED: RequestType
+RT_GET_SENSORS_REPORT: RequestType
+RT_GET_ACTUATORS_REPORT: RequestType
+RT_GET_SENSOR_DATA: RequestType
+RT_GET_ACTUATOR_UPDATE: RequestType
+RT_SET_ACTUATOR_STATE: RequestType
+RT_RUN_ACTUATOR_ACTION: RequestType
+RS_UNSPECIFIED: ReplyStatus
+RS_OK: ReplyStatus
 RS_FAIL: ReplyStatus
 RS_INVALID_STATE: ReplyStatus
-RS_OK: ReplyStatus
+RS_UNKNOWN_DEVICE: ReplyStatus
 RS_UNKNOWN_ACTION: ReplyStatus
 
 class Address(_message.Message):
@@ -93,147 +143,68 @@ class ActuatorUpdate(_message.Message):
     def __init__(self, device_name: _Optional[str] = ..., state: _Optional[str] = ..., metadata: _Optional[str] = ..., timestamp: _Optional[str] = ..., is_online: bool = ...) -> None: ...
 
 class ActuatorCommand(_message.Message):
-    __slots__ = ["body", "type"]
-    BODY_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("type", "body")
     TYPE_FIELD_NUMBER: _ClassVar[int]
-    body: str
+    BODY_FIELD_NUMBER: _ClassVar[int]
     type: CommandType
+    body: str
     def __init__(self, type: _Optional[_Union[CommandType, str]] = ..., body: _Optional[str] = ...) -> None: ...
 
 class ActuatorComply(_message.Message):
-    __slots__ = ["status", "update"]
+    __slots__ = ("status", "update")
     STATUS_FIELD_NUMBER: _ClassVar[int]
     UPDATE_FIELD_NUMBER: _ClassVar[int]
     status: ComplyStatus
     update: ActuatorUpdate
     def __init__(self, status: _Optional[_Union[ComplyStatus, str]] = ..., update: _Optional[_Union[ActuatorUpdate, _Mapping]] = ...) -> None: ...
 
-class ActuatorUpdate(_message.Message):
-    __slots__ = ["device_name", "is_online", "metadata", "state", "timestamp"]
-    DEVICE_NAME_FIELD_NUMBER: _ClassVar[int]
-    IS_ONLINE_FIELD_NUMBER: _ClassVar[int]
-    METADATA_FIELD_NUMBER: _ClassVar[int]
-    STATE_FIELD_NUMBER: _ClassVar[int]
-    TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
-    device_name: str
-    is_online: bool
-    metadata: str
-    state: str
-    timestamp: str
-    def __init__(self, device_name: _Optional[str] = ..., state: _Optional[str] = ..., metadata: _Optional[str] = ..., timestamp: _Optional[str] = ..., is_online: bool = ...) -> None: ...
-
-class ActuatorsReport(_message.Message):
-    __slots__ = ["devices"]
-    DEVICES_FIELD_NUMBER: _ClassVar[int]
-    devices: _containers.RepeatedCompositeFieldContainer[ActuatorUpdate]
-    def __init__(self, devices: _Optional[_Iterable[_Union[ActuatorUpdate, _Mapping]]] = ...) -> None: ...
-
-class Address(_message.Message):
-    __slots__ = ["ip", "port"]
-    IP_FIELD_NUMBER: _ClassVar[int]
-    PORT_FIELD_NUMBER: _ClassVar[int]
-    ip: str
-    port: int
-    def __init__(self, ip: _Optional[str] = ..., port: _Optional[int] = ...) -> None: ...
-
-class ClientReply(_message.Message):
-    __slots__ = ["data", "reply_to", "status"]
-    DATA_FIELD_NUMBER: _ClassVar[int]
-    REPLY_TO_FIELD_NUMBER: _ClassVar[int]
-    STATUS_FIELD_NUMBER: _ClassVar[int]
-    data: bytes
-    reply_to: RequestType
-    status: ReplyStatus
-    def __init__(self, status: _Optional[_Union[ReplyStatus, str]] = ..., reply_to: _Optional[_Union[RequestType, str]] = ..., data: _Optional[bytes] = ...) -> None: ...
-
-class ClientRequest(_message.Message):
-    __slots__ = ["body", "device_name", "type"]
-    BODY_FIELD_NUMBER: _ClassVar[int]
-    DEVICE_NAME_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
-    body: str
-    device_name: str
-    type: RequestType
-    def __init__(self, type: _Optional[_Union[RequestType, str]] = ..., device_name: _Optional[str] = ..., body: _Optional[str] = ...) -> None: ...
-
-class DeviceInfo(_message.Message):
-    __slots__ = ["metadata", "name", "state", "timestamp", "type"]
-    METADATA_FIELD_NUMBER: _ClassVar[int]
-    NAME_FIELD_NUMBER: _ClassVar[int]
-    STATE_FIELD_NUMBER: _ClassVar[int]
-    TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
-    metadata: str
-    name: str
-    state: str
-    timestamp: str
-    type: DeviceType
-    def __init__(self, type: _Optional[_Union[DeviceType, str]] = ..., name: _Optional[str] = ..., state: _Optional[str] = ..., metadata: _Optional[str] = ..., timestamp: _Optional[str] = ...) -> None: ...
-
-class JoinReply(_message.Message):
-    __slots__ = ["report_port"]
-    REPORT_PORT_FIELD_NUMBER: _ClassVar[int]
-    report_port: int
-    def __init__(self, report_port: _Optional[int] = ...) -> None: ...
-
-class JoinRequest(_message.Message):
-    __slots__ = ["device_address", "device_info"]
-    DEVICE_ADDRESS_FIELD_NUMBER: _ClassVar[int]
-    DEVICE_INFO_FIELD_NUMBER: _ClassVar[int]
-    device_address: Address
-    device_info: DeviceInfo
-    def __init__(self, device_info: _Optional[_Union[DeviceInfo, _Mapping]] = ..., device_address: _Optional[_Union[Address, _Mapping]] = ...) -> None: ...
-
 class SensorData(_message.Message):
-    __slots__ = ["device_name", "is_online", "metadata", "readings"]
+    __slots__ = ("device_name", "metadata", "readings", "is_online")
     class SimpleReading(_message.Message):
-        __slots__ = ["reading_value", "timestamp"]
-        READING_VALUE_FIELD_NUMBER: _ClassVar[int]
+        __slots__ = ("timestamp", "reading_value")
         TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
-        reading_value: float
+        READING_VALUE_FIELD_NUMBER: _ClassVar[int]
         timestamp: str
+        reading_value: float
         def __init__(self, timestamp: _Optional[str] = ..., reading_value: _Optional[float] = ...) -> None: ...
     DEVICE_NAME_FIELD_NUMBER: _ClassVar[int]
-    IS_ONLINE_FIELD_NUMBER: _ClassVar[int]
     METADATA_FIELD_NUMBER: _ClassVar[int]
     READINGS_FIELD_NUMBER: _ClassVar[int]
+    IS_ONLINE_FIELD_NUMBER: _ClassVar[int]
     device_name: str
-    is_online: bool
     metadata: str
     readings: _containers.RepeatedCompositeFieldContainer[SensorData.SimpleReading]
+    is_online: bool
     def __init__(self, device_name: _Optional[str] = ..., metadata: _Optional[str] = ..., readings: _Optional[_Iterable[_Union[SensorData.SimpleReading, _Mapping]]] = ..., is_online: bool = ...) -> None: ...
 
-class SensorReading(_message.Message):
-    __slots__ = ["device_name", "is_online", "metadata", "reading_value", "timestamp"]
-    DEVICE_NAME_FIELD_NUMBER: _ClassVar[int]
-    IS_ONLINE_FIELD_NUMBER: _ClassVar[int]
-    METADATA_FIELD_NUMBER: _ClassVar[int]
-    READING_VALUE_FIELD_NUMBER: _ClassVar[int]
-    TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
-    device_name: str
-    is_online: bool
-    metadata: str
-    reading_value: float
-    timestamp: str
-    def __init__(self, device_name: _Optional[str] = ..., reading_value: _Optional[float] = ..., metadata: _Optional[str] = ..., timestamp: _Optional[str] = ..., is_online: bool = ...) -> None: ...
-
 class SensorsReport(_message.Message):
-    __slots__ = ["devices"]
+    __slots__ = ("devices",)
     DEVICES_FIELD_NUMBER: _ClassVar[int]
     devices: _containers.RepeatedCompositeFieldContainer[SensorReading]
     def __init__(self, devices: _Optional[_Iterable[_Union[SensorReading, _Mapping]]] = ...) -> None: ...
 
-class DeviceType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = []
+class ActuatorsReport(_message.Message):
+    __slots__ = ("devices",)
+    DEVICES_FIELD_NUMBER: _ClassVar[int]
+    devices: _containers.RepeatedCompositeFieldContainer[ActuatorUpdate]
+    def __init__(self, devices: _Optional[_Iterable[_Union[ActuatorUpdate, _Mapping]]] = ...) -> None: ...
 
-class CommandType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = []
+class ClientRequest(_message.Message):
+    __slots__ = ("type", "device_name", "body")
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    DEVICE_NAME_FIELD_NUMBER: _ClassVar[int]
+    BODY_FIELD_NUMBER: _ClassVar[int]
+    type: RequestType
+    device_name: str
+    body: str
+    def __init__(self, type: _Optional[_Union[RequestType, str]] = ..., device_name: _Optional[str] = ..., body: _Optional[str] = ...) -> None: ...
 
-class ComplyStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = []
-
-class RequestType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = []
-
-class ReplyStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-    __slots__ = []
+class ClientReply(_message.Message):
+    __slots__ = ("status", "reply_to", "data")
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    REPLY_TO_FIELD_NUMBER: _ClassVar[int]
+    DATA_FIELD_NUMBER: _ClassVar[int]
+    status: ReplyStatus
+    reply_to: RequestType
+    data: bytes
+    def __init__(self, status: _Optional[_Union[ReplyStatus, str]] = ..., reply_to: _Optional[_Union[RequestType, str]] = ..., data: _Optional[bytes] = ...) -> None: ...
