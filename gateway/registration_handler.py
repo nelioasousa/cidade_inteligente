@@ -10,13 +10,13 @@ from messages_pb2 import Address, JoinRequest, JoinReply, DeviceType
 
 def multicast_location(
     stop_flag,
-    host_ip,
     multicast_ip,
     multicast_port,
     multicast_interval,
+    host_ip,
+    registration_port,
     broker_ip,
     broker_port,
-    registration_port,
 ):
     logger = logging.getLogger('MULTICASTER')
     logger.info(
@@ -47,7 +47,7 @@ def multicast_location(
 
 
 def registration_handler(
-    sensors_port,
+    publish_exchange,
     sensors_tolerance,
     actuators_port,
     actuators_tolerance,
@@ -67,7 +67,7 @@ def registration_handler(
         match request.device_info.type:
             case DeviceType.DT_SENSOR:
                 sensors_repository = get_sensors_repository()
-                report_port = sensors_port
+                reply = JoinReply(publish_exchange=publish_exchange)
                 metadata = json.loads(device_info.metadata)
                 sensors_repository.add_sensor(
                     sensor_id=device_id,
@@ -78,7 +78,7 @@ def registration_handler(
                 )
             case DeviceType.DT_ACTUATOR:
                 actuators_repository = get_actuators_repository()
-                report_port = actuators_port
+                reply = JoinReply(report_port=actuators_port)
                 state = json.loads(device_info.state)
                 metadata = json.loads(device_info.metadata)
                 timestamp = datetime.fromisoformat(device_info.timestamp)
@@ -94,7 +94,6 @@ def registration_handler(
                 )
             case _:
                 raise ValueError('Invalid DeviceType')
-        reply = JoinReply(report_port=report_port)
         sock.send(reply.SerializeToString())
         logger.info('Ingresso bem-sucedido: %s', device_info.name)
     except Exception as e:
@@ -120,7 +119,7 @@ def registration_handler(
 def registration_listener(
     stop_flag,
     registration_port,
-    sensors_port,
+    publish_exchange,
     sensors_tolerance,
     actuators_port,
     actuators_tolerance,
@@ -145,7 +144,7 @@ def registration_listener(
                     conn.settimeout(sock.gettimeout())
                     executor.submit(
                         registration_handler,
-                        sensors_port,
+                        publish_exchange,
                         sensors_tolerance,
                         actuators_port,
                         actuators_tolerance,

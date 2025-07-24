@@ -8,6 +8,7 @@ from numbers import Real
 from datetime import datetime, UTC
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
+from google.protobuf.message import DecodeError
 from messages_pb2 import Address
 from messages_pb2 import DeviceType, DeviceInfo, JoinRequest, JoinReply
 from messages_pb2 import ActuatorUpdate
@@ -50,7 +51,10 @@ def gateway_discoverer(args):
                     disconnect_device(args)
                 continue
             gateway_addrs = Address()
-            gateway_addrs.ParseFromString(msg)
+            try:
+                gateway_addrs.ParseFromString(msg)
+            except DecodeError:
+                continue
             seq_fails = 0
             if gateway_addrs.ip == args.gateway_ip:
                 continue

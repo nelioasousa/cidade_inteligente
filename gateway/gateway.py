@@ -41,7 +41,7 @@ def _run():
             args=(
                 stop_flag,
                 configs.registration_port,
-                configs.sensors_port,
+                configs.publish_exchange,
                 configs.sensors_tolerance,
                 configs.actuators_port,
                 configs.actuators_tolerance,
@@ -73,13 +73,13 @@ def _run():
             target=stop_wrapper(multicast_location, stop_flag),
             args=(
                 stop_flag,
-                configs.host_ip,
                 configs.multicast_ip,
                 configs.multicast_port,
                 configs.multicast_interval,
+                configs.host_ip,
+                configs.registration_port,
                 configs.broker_ip,
                 configs.broker_port,
-                configs.registration_port,
             ),
         )
         rlistener.start()

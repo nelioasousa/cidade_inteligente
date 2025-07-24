@@ -1,6 +1,5 @@
 clients_port: 50000
 registration_port: 50111
-sensors_port: 50222
 actuators_port: 50333
 multicast_ip: "224.0.1.0"
 multicast_port: 50444
@@ -9,3 +8,4 @@ sensors_tolerance: 6.0
 actuators_tolerance: 6.0
 broker_ip: "localhost"
 broker_port: 5672
+publish_exchange: "readings"

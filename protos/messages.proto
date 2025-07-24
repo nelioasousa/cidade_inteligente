@@ -32,6 +32,7 @@ message JoinRequest {
 
 message JoinReply {
   uint32 report_port = 1;
+  string publish_exchange = 2;
 }
 
 
