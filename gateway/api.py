@@ -133,7 +133,6 @@ class Actuator(Resource):
     def put(self, actuator_category: str, actuator_id: int):
         data = request.get_json()
         response = send_actuator_command(
-            args=SimpleNamespace(base_timeout=1.0),
             actuator_id=actuator_id,
             actuator_category=actuator_category,
             command_type=CommandType.CT_SET_STATE,
@@ -152,7 +151,6 @@ class Actuator(Resource):
         if 'action' not in data:
             abort(400, message='No "action" was specified')
         response = send_actuator_command(
-            args=SimpleNamespace(base_timeout=1.0),
             actuator_id=actuator_id,
             actuator_category=actuator_category,
             command_type=CommandType.CT_ACTION,

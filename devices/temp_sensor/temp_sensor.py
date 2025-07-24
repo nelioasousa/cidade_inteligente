@@ -68,10 +68,7 @@ def discoverer(args):
                 or addresses.publish_exchange != args.publish_exchange
             ):
                 logger.info(
-                    'Broker realocado: (%s:%d, %s) -> (%s:%d, %s). Reconectando...',
-                    args.message_broker_ip,
-                    args.message_broker_port,
-                    args.publish_exchange,
+                    'Novo Broker encontrado: (%s:%d, %s). Reconectando...',
                     addresses.broker_ip,
                     addresses.broker_port,
                     addresses.publish_exchange,
