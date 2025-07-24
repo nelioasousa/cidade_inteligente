@@ -73,16 +73,18 @@ RS_UNKNOWN_DEVICE: ReplyStatus
 RS_UNKNOWN_ACTION: ReplyStatus
 
 class Address(_message.Message):
-    __slots__ = ("ip", "port", "broker_ip", "broker_port")
+    __slots__ = ("ip", "port", "broker_ip", "broker_port", "publish_exchange")
     IP_FIELD_NUMBER: _ClassVar[int]
     PORT_FIELD_NUMBER: _ClassVar[int]
     BROKER_IP_FIELD_NUMBER: _ClassVar[int]
     BROKER_PORT_FIELD_NUMBER: _ClassVar[int]
+    PUBLISH_EXCHANGE_FIELD_NUMBER: _ClassVar[int]
     ip: str
     port: int
     broker_ip: str
     broker_port: int
-    def __init__(self, ip: _Optional[str] = ..., port: _Optional[int] = ..., broker_ip: _Optional[str] = ..., broker_port: _Optional[int] = ...) -> None: ...
+    publish_exchange: str
+    def __init__(self, ip: _Optional[str] = ..., port: _Optional[int] = ..., broker_ip: _Optional[str] = ..., broker_port: _Optional[int] = ..., publish_exchange: _Optional[str] = ...) -> None: ...
 
 class DeviceInfo(_message.Message):
     __slots__ = ("type", "name", "state", "metadata", "timestamp")
@@ -107,12 +109,10 @@ class JoinRequest(_message.Message):
     def __init__(self, device_info: _Optional[_Union[DeviceInfo, _Mapping]] = ..., device_address: _Optional[_Union[Address, _Mapping]] = ...) -> None: ...
 
 class JoinReply(_message.Message):
-    __slots__ = ("report_port", "publish_exchange")
+    __slots__ = ("report_port",)
     REPORT_PORT_FIELD_NUMBER: _ClassVar[int]
-    PUBLISH_EXCHANGE_FIELD_NUMBER: _ClassVar[int]
     report_port: int
-    publish_exchange: str
-    def __init__(self, report_port: _Optional[int] = ..., publish_exchange: _Optional[str] = ...) -> None: ...
+    def __init__(self, report_port: _Optional[int] = ...) -> None: ...
 
 class SensorReading(_message.Message):
     __slots__ = ("device_name", "reading_value", "metadata", "timestamp", "is_online")
