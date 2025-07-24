@@ -7,6 +7,7 @@ message Address {
   uint32 port = 2;
   string broker_ip = 3;
   uint32 broker_port = 4;
+  string publish_exchange = 5;
 }
 
 
@@ -32,7 +33,6 @@ message JoinRequest {
 
 message JoinReply {
   uint32 report_port = 1;
-  string publish_exchange = 2;
 }
 
 

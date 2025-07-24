@@ -66,7 +66,6 @@ def _run():
             args=(
                 stop_flag,
                 configs.registration_port,
-                configs.publish_exchange,
                 configs.sensors_tolerance,
                 configs.actuators_port,
                 configs.actuators_tolerance,
@@ -83,6 +82,7 @@ def _run():
                 configs.registration_port,
                 configs.broker_ip,
                 configs.broker_port,
+                configs.publish_exchange,
             ),
         )
         se_consumer.start()

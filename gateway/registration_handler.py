@@ -17,6 +17,7 @@ def multicast_locations(
     registration_port,
     broker_ip,
     broker_port,
+    publish_exchange,
 ):
     logger = logging.getLogger('MULTICASTER')
     logger.info(
@@ -29,6 +30,7 @@ def multicast_locations(
         port=registration_port,
         broker_ip=broker_ip,
         broker_port=broker_port,
+        publish_exchange=publish_exchange,
     )
     addrs = addrs.SerializeToString()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
@@ -47,7 +49,6 @@ def multicast_locations(
 
 
 def registration_handler(
-    publish_exchange,
     sensors_tolerance,
     actuators_port,
     actuators_tolerance,
@@ -67,7 +68,7 @@ def registration_handler(
         match request.device_info.type:
             case DeviceType.DT_SENSOR:
                 sensors_repository = get_sensors_repository()
-                reply = JoinReply(publish_exchange=publish_exchange)
+                reply = JoinReply()
                 metadata = json.loads(device_info.metadata)
                 sensors_repository.add_sensor(
                     sensor_id=device_id,
@@ -119,7 +120,6 @@ def registration_handler(
 def registration_listener(
     stop_flag,
     registration_port,
-    publish_exchange,
     sensors_tolerance,
     actuators_port,
     actuators_tolerance,
@@ -144,7 +144,6 @@ def registration_listener(
                     conn.settimeout(sock.gettimeout())
                     executor.submit(
                         registration_handler,
-                        publish_exchange,
                         sensors_tolerance,
                         actuators_port,
                         actuators_tolerance,

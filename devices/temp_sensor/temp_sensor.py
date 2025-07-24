@@ -43,8 +43,8 @@ def discoverer(args):
                         'Gateway em %s está offline. Desconectando...',
                         args.gateway_ip,
                     )
+                    args.gateway_ip = None
                     disconnect_broker(args)
-                    disconnect_gateway(args)
                 continue
             addresses = Address()
             try:
@@ -53,27 +53,51 @@ def discoverer(args):
                 continue
             seq_fails = 0
             if addresses.ip != args.gateway_ip:
-                disconnect_gateway(args)
                 result = try_registration(args, addresses.ip, addresses.port)
+                logger.warning(
+                    'Falha durante registro em (%s, %d)',
+                    addresses.ip,
+                    addresses.port,
+                )
                 if not result:
                     disconnect_broker(args)
                     continue
-            if addresses.broker_ip != args.message_broker_ip:
+            if (
+                addresses.broker_ip != args.message_broker_ip
+                or addresses.broker_port != args.message_broker_port
+                or addresses.publish_exchange != args.publish_exchange
+            ):
+                logger.info(
+                    'Broker realocado: (%s:%d, %s) -> (%s:%d, %s). Reconectando...',
+                    args.message_broker_ip,
+                    args.message_broker_port,
+                    args.publish_exchange,
+                    addresses.broker_ip,
+                    addresses.broker_port,
+                    addresses.publish_exchange,
+                )
                 disconnect_broker(args)
-                register_broker(args, addresses.broker_ip, addresses.broker_port)
-
-
-def disconnect_gateway(args):
-    with args.gateway_lock:
-        args.gateway_ip = None
-        args.publish_exchange = None
+                register_broker(
+                    args,
+                    addresses.broker_ip,
+                    addresses.broker_port,
+                    addresses.publish_exchange,
+                )
 
 
 def disconnect_broker(args):
     with args.broker_lock:
         args.message_broker_ip = None
         args.message_broker_port = None
+        args.publish_exchange = None
     args.disconnect_flag.set()
+
+
+def register_broker(args, broker_ip, broker_port, publish_exchange):
+    with args.broker_lock:
+        args.message_broker_ip = broker_ip
+        args.message_broker_port = broker_port
+        args.publish_exchange = publish_exchange
 
 
 def try_registration(args, gateway_ip, registration_port):
@@ -95,17 +119,10 @@ def try_registration(args, gateway_ip, registration_port):
             join_reply = JoinReply()
             join_reply.ParseFromString(sock.recv(1024))
         except Exception:
+            args.gateway_ip = None
             return False
-    with args.gateway_lock:
-        args.gateway_ip = gateway_ip
-        args.publish_exchange = join_reply.publish_exchange
+    args.gateway_ip = gateway_ip
     return True
-
-
-def register_broker(args, broker_ip, broker_port):
-    with args.broker_lock:
-        args.message_broker_ip = broker_ip
-        args.message_broker_port = broker_port
 
 
 def get_reading(args):
@@ -118,6 +135,7 @@ def get_reading(args):
 def readings_publisher(args):
     logger = logging.getLogger('READINGS_PUBLISHER')
     while not args.stop_flag.is_set():
+        args.disconnect_flag.clear()
         with args.broker_lock:
             broker_ip = args.message_broker_ip
             broker_port = args.message_broker_port
@@ -166,7 +184,6 @@ def readings_publisher(args):
             )
             channel.close()
             connection.close()
-            args.disconnect_flag.clear()
 
 
 def stop_wrapper(func, stop_flag):
@@ -264,16 +281,15 @@ def main():
     # Host IP
     args.host_ip = socket.gethostbyname('localhost')
 
-    # Gateway
-    args.gateway_lock = threading.Lock()
+    # Gateway IP
     args.gateway_ip = None
-    args.publish_exchange = None
 
     # Broker
     args.broker_lock = threading.Lock()
     args.disconnect_flag = threading.Event()
     args.message_broker_ip = None
     args.message_broker_port = None
+    args.publish_exchange = None
 
     # Metadata
     args.metadata = {
