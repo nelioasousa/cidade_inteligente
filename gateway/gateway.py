@@ -3,7 +3,7 @@ import socket
 import threading
 import logging
 from functools import wraps
-from api import app
+from api import app, ApiServerThread
 from registration_handler import multicast_locations, registration_listener
 from sensors_handler import sensors_consumer
 from actuators_handler import actuators_listener
@@ -85,12 +85,19 @@ def _run():
                 configs.publish_exchange,
             ),
         )
+        api_server = ApiServerThread(
+            stop_flag,
+            configs.host_ip,
+            configs.api_port,
+            app,
+        )
         se_consumer.start()
         ac_listener.start()
         cl_listener.start()
         re_listener.start()
         multicaster.start()
-        app.run(port=configs.api_port)
+        api_server.start()
+        stop_flag.wait()
     except KeyboardInterrupt:
         print('\nSHUTTING DOWN...')
     finally:
@@ -100,6 +107,7 @@ def _run():
         cl_listener.join()
         re_listener.join()
         multicaster.join()
+        api_server.shutdown()
 
 
 def main():

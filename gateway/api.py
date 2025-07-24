@@ -1,7 +1,8 @@
 import json
-from types import SimpleNamespace
+import threading
 from flask import Flask, request
 from flask_restful import Api, Resource, abort
+from werkzeug.serving import make_server
 from actuators_handler import send_actuator_command
 from db.repositories import get_sensors_repository, get_actuators_repository
 from messages_pb2 import CommandType, ComplyStatus
@@ -13,6 +14,24 @@ api = Api(app)
 
 sensors_repository = get_sensors_repository()
 actuators_repository = get_actuators_repository()
+
+
+class ApiServerThread(threading.Thread):
+    def __init__(self, stop_flag, host_ip, port, app):
+        threading.Thread.__init__(self)
+        self.stop_flag = stop_flag
+        self.server = make_server(host_ip, port, app)
+        self.ctx = app.app_context()
+        self.ctx.push()
+
+    def run(self):
+        try:
+            self.server.serve_forever()
+        finally:
+            self.stop_flag.set()
+
+    def shutdown(self):
+        self.server.shutdown()
 
 
 class Sensors(Resource):
