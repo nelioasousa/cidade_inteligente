@@ -23,11 +23,15 @@ def register_reading(body):
 def sensors_consumer(stop_flag, broker_ip, broker_port, publish_exchange):
     logger = logging.getLogger('SENSORS_CONSUMER')
     def callback(ch, method, properties, body):
-        logger.debug('Processando nova mensagem do Broker')
         try:
             result, sensor_name = register_reading(body)
-        except Exception:
-            logger.error('Falha ao processar mensagem')
+        except Exception as e:
+            logger.error(
+                'Falha ao processar mensagem: (%s) %s',
+                type(e).__name__,
+                e,
+            )
+            return
         if result:
             logger.debug(
                 'Leitura de sensor recebida: %s',
@@ -38,9 +42,6 @@ def sensors_consumer(stop_flag, broker_ip, broker_port, publish_exchange):
                 'Recebendo leituras de um sensor não registrado: %s',
                 sensor_name,
             )
-        if stop_flag.is_set():
-            logger.info('Parando consumo de mensagens...')
-            ch.stop_consuming()
     connection = pika.BlockingConnection(
         pika.ConnectionParameters(
             host=broker_ip,
@@ -62,7 +63,10 @@ def sensors_consumer(stop_flag, broker_ip, broker_port, publish_exchange):
             on_message_callback=callback,
             auto_ack=True,
         )
-        channel.start_consuming()
+        logger.info('Iniciando consumo de mensagens do Broker...')
+        while not stop_flag.is_set():
+            connection.process_data_events(time_limit=1.0)
+        logger.info('Finalizando consumo de mensagens...')
     finally:
         channel.close()
         connection.close()
