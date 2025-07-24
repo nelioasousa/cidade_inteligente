@@ -151,7 +151,6 @@ def readings_publisher(args):
                     device_name=args.name,
                     reading_value=get_reading(args),
                     timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
-                    metadata=json.dumps(args.metadata),
                 )
                 channel.basic_publish(
                     exchange=args.publish_exchange,
@@ -211,7 +210,7 @@ def main():
     )
 
     parser.add_argument(
-        '--multicast_port', type=int, default=50444,
+        '--multicast_port', type=int, default=50333,
         help='Porta na qual escutar por mensagens do grupo multicast.'
     )
 

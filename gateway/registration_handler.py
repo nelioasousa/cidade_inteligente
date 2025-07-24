@@ -8,7 +8,7 @@ from db.repositories import get_sensors_repository, get_actuators_repository
 from messages_pb2 import Address, JoinRequest, JoinReply, DeviceType
 
 
-def multicast_location(
+def multicast_locations(
     stop_flag,
     multicast_ip,
     multicast_port,
@@ -20,7 +20,7 @@ def multicast_location(
 ):
     logger = logging.getLogger('MULTICASTER')
     logger.info(
-        'Enviando endereço de registro para grupo multicast (%s, %s)',
+        'Enviando endereços para grupo multicast (%s, %s)',
         multicast_ip,
         multicast_port,
     )

@@ -64,7 +64,6 @@ class SensorsByCategory(Resource):
 class Sensor(Resource):
 
     def get(self, sensor_category: str, sensor_id: int):
-        sensor_category = sensor_category.lower()
         sensor = sensors_repository.get_sensor(sensor_id, sensor_category)
         if sensor is None:
             abort(404, message=f'Sensor {sensor_category}-{sensor_id} not found')
@@ -119,7 +118,6 @@ class ActuatorsByCategory(Resource):
 class Actuator(Resource):
 
     def get(self, actuator_category: str, actuator_id: int):
-        actuator_category = actuator_category.lower()
         actuator = actuators_repository.get_actuator(actuator_id, actuator_category)
         if actuator is None:
             abort(404, message=f'Actuator {actuator_category}-{actuator_id} not found')
@@ -145,7 +143,7 @@ class Actuator(Resource):
             abort(404, message=f'Actuator {actuator_category}-{actuator_id} not found')
         if response.status is ComplyStatus.CS_INVALID_STATE:
             abort(400, message='Invalid state supplied')
-        if response.status is ComplyStatus.CS_FAIL:
+        if response.status is not ComplyStatus.CS_OK:
             abort(500, message='Something went wrong')
         return {"message": "OK"}, 200
 
@@ -164,7 +162,7 @@ class Actuator(Resource):
             abort(404, message=f'Actuator {actuator_category}-{actuator_id} not found')
         if response.status is ComplyStatus.CS_UNKNOWN_ACTION:
             abort(400, message=f'Unknown action "{data['action']}"')
-        if response.status is ComplyStatus.CS_FAIL:
+        if response.status is not ComplyStatus.CS_OK:
             abort(500, message='Something went wrong')
         return {"message": "OK"}, 200
 

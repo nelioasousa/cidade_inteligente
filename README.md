@@ -54,7 +54,7 @@ flowchart BT
         relatorios([Gerador de Relatórios])
     end
 
-    desc_descobrimento[Socket UDP enviando o endereço do Serviço de Registro ao grupo multicast 224.0.1.0 na porta 50444. Envia a cada 5 segundos.]
+    desc_descobrimento[Socket UDP enviando o endereço do Serviço de Registro ao grupo multicast 224.0.1.0 na porta 50333. Envia a cada 5 segundos.]
     desc_descobrimento --- descobrimento
 
     desc_registro[Servidor TCP escutando na porta 50111. É responsável pelo registro de dispositivos inteligentes.]
@@ -63,7 +63,7 @@ flowchart BT
     desc_sensores[Socket UDP escutando na porta 50222. É responsável por receber leituras dos sensores registrados.]
     desc_sensores --- sensores
 
-    desc_atuadores[Servidor TCP escutando na porta 50333. É responsável por receber atualizações dos atuadores registrados. Também possuí funcionalidades para enviar comandos aos atuadores.]
+    desc_atuadores[Servidor TCP escutando na porta 50222. É responsável por receber atualizações dos atuadores registrados. Também possuí funcionalidades para enviar comandos aos atuadores.]
     desc_atuadores --- atuadores
 
     desc_relatorios[Gera a cada 5 segundos relatórios sobre os dispositivos registrados. Os relatórios contêm informações como metadados, estado e disponibilidade. Os clientes podem solicitar os relatórios.]

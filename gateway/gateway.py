@@ -4,7 +4,7 @@ import threading
 import logging
 from functools import wraps
 from api import app
-from registration_handler import multicast_location, registration_listener
+from registration_handler import multicast_locations, registration_listener
 from sensors_handler import sensors_consumer
 from actuators_handler import actuators_listener
 from clients_handler import clients_listener
@@ -29,6 +29,8 @@ def load_configs():
     with config_file.open('r') as f:
         configs = SimpleNamespace(**yaml.safe_load(f))
     configs.host_ip = socket.gethostbyname('localhost')
+    if configs.broker_ip == 'localhost':
+        configs.broker_ip = configs.host_ip
     return configs
 
 
@@ -36,7 +38,30 @@ def _run():
     try:
         configs = load_configs()
         stop_flag = threading.Event()
-        rlistener = threading.Thread(
+        se_consumer = threading.Thread(
+            target=stop_wrapper(sensors_consumer, stop_flag),
+            args=(
+                stop_flag,
+                configs.broker_ip,
+                configs.broker_port,
+                configs.publish_exchange,
+            ),
+        )
+        ac_listener = threading.Thread(
+            target=stop_wrapper(actuators_listener, stop_flag),
+            args=(
+                stop_flag,
+                configs.actuators_port,
+            ),
+        )
+        cl_listener = threading.Thread(
+            target=stop_wrapper(clients_listener, stop_flag),
+            args=(
+                stop_flag,
+                configs.clients_port,
+            ),
+        )
+        re_listener = threading.Thread(
             target=stop_wrapper(registration_listener, stop_flag),
             args=(
                 stop_flag,
@@ -47,30 +72,8 @@ def _run():
                 configs.actuators_tolerance,
             ),
         )
-        sconsumer = threading.Thread(
-            target=stop_wrapper(sensors_consumer, stop_flag),
-            args=(
-                stop_flag,
-                configs.broker_ip,
-                configs.broker_port,
-            ),
-        )
-        alistener = threading.Thread(
-            target=stop_wrapper(actuators_listener, stop_flag),
-            args=(
-                stop_flag,
-                configs.actuators_port,
-            ),
-        )
-        clistener = threading.Thread(
-            target=stop_wrapper(clients_listener, stop_flag),
-            args=(
-                stop_flag,
-                configs.clients_port,
-            ),
-        )
         multicaster = threading.Thread(
-            target=stop_wrapper(multicast_location, stop_flag),
+            target=stop_wrapper(multicast_locations, stop_flag),
             args=(
                 stop_flag,
                 configs.multicast_ip,
@@ -82,18 +85,18 @@ def _run():
                 configs.broker_port,
             ),
         )
-        rlistener.start()
-        sconsumer.start()
-        alistener.start()
-        clistener.start()
+        se_consumer.start()
+        ac_listener.start()
+        cl_listener.start()
+        re_listener.start()
         multicaster.start()
-        app.run(port=8080)
+        app.run(port=configs.api_port)
     finally:
         stop_flag.set()
-        rlistener.join()
-        sconsumer.join()
-        alistener.join()
-        clistener.join()
+        re_listener.join()
+        se_consumer.join()
+        ac_listener.join()
+        cl_listener.join()
         multicaster.join()
 
 

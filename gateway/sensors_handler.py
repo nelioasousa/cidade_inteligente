@@ -1,4 +1,3 @@
-import socket
 import logging
 import datetime
 import pika
@@ -18,14 +17,19 @@ def register_reading(body):
         reading_value=reading.reading_value,
         reading_timestamp=datetime.datetime.fromisoformat(reading.timestamp),
     )
-    print(type(body))
 
 
-def sensors_consumer(stop_flag, broker_ip, broker_port):
+def sensors_consumer(stop_flag, broker_ip, broker_port, publish_exchange):
+    logger = logging.getLogger('SENSORS_CONSUMER')
     def callback(ch, method, properties, body):
+        logger.debug('Processando nova mensagem do Broker')
+        try:
+            register_reading(body)
+        except Exception:
+            logger.error('Falha ao processar mensagem')
         if stop_flag.is_set():
+            logger.info('Parando consumo de mensagens...')
             ch.stop_consuming()
-        return register_reading(body)
     connection = pika.BlockingConnection(
         pika.ConnectionParameters(
             host=broker_ip,
@@ -35,10 +39,13 @@ def sensors_consumer(stop_flag, broker_ip, broker_port):
     )
     channel = connection.channel()
     try:
-        channel.exchange_declare(exchange='readings', exchange_type='fanout')
+        channel.exchange_declare(
+            exchange=publish_exchange,
+            exchange_type='fanout',
+        )
         result = channel.queue_declare(queue='', exclusive=True)
         exclusive_queue = result.method.queue
-        channel.queue_bind(exchange='readings', queue=exclusive_queue)
+        channel.queue_bind(exchange=publish_exchange, queue=exclusive_queue)
         channel.basic_consume(
             queue=exclusive_queue,
             on_message_callback=callback,
