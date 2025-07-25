@@ -38,13 +38,22 @@ def discoverer(args):
                 seq_fails += 1
                 if (
                     args.gateway_ip is not None
-                    and seq_fails >= args.disconnect_after
+                    and seq_fails >= args.disconnect_gateway_after
                 ):
                     logger.warning(
                         'Gateway em %s está offline. Desconectando...',
                         args.gateway_ip,
                     )
                     args.gateway_ip = None
+                if (
+                    args.message_broker_ip is not None
+                    and seq_fails >= args.disconnect_broker_after
+                ):
+                    logger.warning(
+                        'Gateway offline há muito tempo. '
+                        'Desconectando do Broker em %s...',
+                        args.message_broker_ip,
+                    )
                     disconnect_broker(args)
                 continue
             addresses = Address()
@@ -145,7 +154,7 @@ def readings_publisher(args):
             publish_exchange = args.publish_exchange
         if broker_ip is None:
             logger.info('Sem conexão com o Broker')
-            time.sleep(1.0)
+            time.sleep(2.0)
             continue
         try:
             connection = pika.BlockingConnection(
@@ -184,6 +193,7 @@ def readings_publisher(args):
                             body=reading,
                         )
                         fail_count = 0
+                        max_num_fails = 3
                     except Exception as e:
                         fail_count += 1
                         logger.error(
@@ -191,10 +201,10 @@ def readings_publisher(args):
                             type(e).__name__,
                             e,
                         )
-                        if fail_count > args.disconnect_after:
+                        if fail_count > max_num_fails:
                             logger.warning(
                                 '%d falhas consecutivas no envio de mensagens',
-                                args.disconnect_after,
+                                max_num_fails,
                             )
                             break
                     time.sleep(args.report_interval)
@@ -290,8 +300,13 @@ def main():
     )
 
     parser.add_argument(
-        '--disconnect_after', type=int, default=3,
-        help='Número de falhas sequenciais necessárias para desconectar o dispositivo.'
+        '--disconnect_gateway_after', type=int, default=3,
+        help='Número de falhas necessárias para desconectar o Gateway.'
+    )
+
+    parser.add_argument(
+        '--disconnect_broker_after', type=int, default=7,
+        help='Número de falhas necessárias para desconectar o Broker.'
     )
 
     parser.add_argument(
