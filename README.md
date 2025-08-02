@@ -1,4 +1,4 @@
-# 🌐 Cidade Inteligente - Sistemas Distribuídos com Sockets
+# 🌐 Cidade Inteligente
 Este projeto simula uma Cidade Inteligente composta por sensores, atuadores e clientes, todos interconectados por meio de um Gateway central. O objetivo é fornecer uma base prática para o estudo de sistemas distribuídos e redes de comunicação.
 
 Clientes interagem com o sistema exclusivamente por meio do Gateway, que atua como intermediário para monitoramento, controle e consumo de dados dos dispositivos inteligentes.
@@ -13,9 +13,9 @@ Dispositivos e clientes se comunicam diretamente com o Gateway por meio de socke
 
 Foi introduzido um Message Broker (RabbitMQ) entre sensores e Gateway, promovendo uma comunicação assíncrona e desacoplada.
 
-A comunicação com os atuadores foi migrada de protobuf puro para gRPC, proporcionando maior padronização e robustez.
+A comunicação com os atuadores foi (será) migrada de protobuf puro para gRPC.
 
-Também foi desenvolvida uma Web API que permite o acesso de clientes ao sistema via HTTP, mantendo-se o suporte à comunicação original (sockets + protobuf) por questões de retrocompatibilidade.
+Também foi desenvolvida uma Web API que permite o acesso de clientes ao sistema via HTTP. A comunicação original (sockets + protobuf) foi mantida por questões de retrocompatibilidade.
 
 As mensagens trafegadas via RabbitMQ continuam a ser serializadas usando protobuf.
 
@@ -36,23 +36,21 @@ Intermediário entre sensores e o gateway, proporcionando comunicação assíncr
 
 🖥️ **Clientes**
 
-Interfaces (CLI, Web e Mobile) para monitoramento e controle dos dispositivos em tempo real.
+Interface para monitoramento e controle dos dispositivos em tempo real.
 
 ## 🔧 Tecnologias Utilizadas
 
 **Ubuntu 24.04:** sistema operacional base. Os sockets foram configurados visando compatibilidade com ambientes Unix.
 
-**Python 3.12.3:** linguagem principal utilizada no desenvolvimento do gateway, Web API, cliente CLI, sensor de temperatura e semáforo.
-
-**Node.js 22.17.0:** utilizado na implementação da lâmpada inteligente (poste de iluminação).
+**Python 3.12.3:** linguagem base utilizada nos nós do sistema.
 
 **Sockets TCP e UDP:** base para a comunicação direta entre dispositivos.
 
 **UDP Multicast:** mecanismo usado para descoberta automática do Gateway e Broker por parte dos dispositivos inteligentes.
 
-**Protocol Buffers (libprotoc 31.1):** protocolo de serialização utilizado na comunicação entre componentes distribuídos.
+**Protocol Buffers:** protocolo de serialização utilizado na comunicação entre componentes distribuídos.
 
-**Flutter 3.32.5:** framework utilizado para o desenvolvimento do cliente com interface web e mobile.
+**RabbitMQ:** message broker para desacoplamento da comunicação Sensores-Gateway.
 
 
 ## 📦 Estrutura de Diretórios
@@ -60,14 +58,11 @@ Interfaces (CLI, Web e Mobile) para monitoramento e controle dos dispositivos em
 ```
 cidade_inteligente/
 ├── clients/
-│   └── simple_client/      # Cliente CLI Python
-│   └── client_flutter/     # Cliente Web/Mobile Flutter
+│   └── simple_client/      # Cliente CLI
 ├── devices/                # Dispositivos inteligentes
-│   ├── lamp_node/          # Lâmpada inteligente em Node.js
-│   ├── semaphore/          # Semáforo em Python
-│   └── temp_sensor/        # Sensor de temperatura em Python
-├── exemplos/               # Code snippets
-├── gateway/                # Código do Gateway em Python
+│   ├── semaphore/          # Semáforo
+│   └── temp_sensor/        # Sensor de temperatura
+├── gateway/                # Gateway
 |   ├── db/                      # Banco de dados usando SQLAlchemy + SQLite
 |   ├── actuators_handler.py     # Módulo responsável pelos atuadores
 |   ├── api.py                   # Web API
@@ -93,9 +88,10 @@ $ protoc --version
 libprotoc 31.1
 # Python
 $ protoc --python_out=. --pyi_out=. messages.proto
-# Node.js
-$ npm install -g protoc-gen-js
-$ protoc --js_out=import_style=commonjs,binary:. messages.proto
+$ cp -f messages_pb2.py* ../gateway/
+$ cp -f messages_pb2.py* ../devices/semaphore/
+$ cp -f messages_pb2.py* ../devices/temp_sensor/
+$ cp -f messages_pb2.py* ../clients/simple_client/
 ```
 
 ### 2. Rodar os componentes
@@ -126,7 +122,7 @@ options:
 (venv) $ python gateway.py --clear
 ```
 
-**Semáfoto**
+**Semáforo**
 
 ```bash
 $ cd cidade_inteligente/devices/semaphore/
@@ -164,7 +160,8 @@ $ source venv/bin/activate
 (venv) $ python temp_sensor.py --help
 usage: temp_sensor.py [-h] [--id ID] [--multicast_ip MULTICAST_IP] [--multicast_port MULTICAST_PORT] [--report_interval REPORT_INTERVAL]
                       [--temperature TEMPERATURE] [--max_temperature MAX_TEMPERATURE] [--min_temperature MIN_TEMPERATURE]
-                      [--disconnect_after DISCONNECT_AFTER] [-l {DEBUG,INFO,WARN,ERROR}]
+                      [--disconnect_gateway_after DISCONNECT_GATEWAY_AFTER] [--disconnect_broker_after DISCONNECT_BROKER_AFTER]
+                      [-l {DEBUG,INFO,WARN,ERROR}]
 
 Sensor de temperatura.
 
@@ -183,8 +180,10 @@ options:
                         Temperatura máximo do sensor em °C.
   --min_temperature MIN_TEMPERATURE
                         Temperatura mínima do sensor em °C.
-  --disconnect_after DISCONNECT_AFTER
-                        Número de falhas sequenciais necessárias para desconectar o dispositivo.
+  --disconnect_gateway_after DISCONNECT_GATEWAY_AFTER
+                        Número de falhas necessárias para desconectar o Gateway.
+  --disconnect_broker_after DISCONNECT_BROKER_AFTER
+                        Número de falhas necessárias para desconectar o Broker.
   -l {DEBUG,INFO,WARN,ERROR}, --level {DEBUG,INFO,WARN,ERROR}
                         Nível do logging.
 (venv) $ python temp_sensor.py
@@ -215,12 +214,4 @@ The following commands are available:
             : <value> must be a valid stringfyed JSON value
             : <key> must not be enclosed in double quotes
             : If <value> is a string, it must be enclosed in double quotes
-```
-
-**Node.js:**
-
-```bash
-$ cd cidade_inteligente/devices/lamp_node/
-$ npm install protobufjs
-$ npm run start
 ```
