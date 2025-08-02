@@ -1,14 +1,8 @@
-# Cache do Python
+# Python
 __pycache__
 
-# Ambiente virtual (venv) do Python
+# Ambiente virtual
 venv/
 
-# Outros
-db.pickle
+# Banco de dados local
 local.db
-
-# Node
-devices/lamp_node/package-lock.json
-devices/lamp_node/node_modules/
-.venv/
